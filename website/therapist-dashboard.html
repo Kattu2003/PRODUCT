@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Therapist Dashboard - V-Kare</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <h2>V-Kare</h2>
+            </div>
+            <div class="nav-menu" id="nav-menu">
+                <a href="index.html" class="nav-link">Home</a>
+                <a href="about.html" class="nav-link">About Us</a>
+                <a href="resources.html" class="nav-link">Resources</a>
+                <div class="user-menu">
+                    <span class="user-name">Dr. Sarah Chen</span>
+                    <button class="logout-btn" onclick="logout()">Logout</button>
+                </div>
+            </div>
+            <div class="hamburger" id="hamburger">
+                <span class="bar"></span>
+                <span class="bar"></span>
+                <span class="bar"></span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Dashboard Layout -->
+    <div class="dashboard-layout">
+        <!-- Sidebar -->
+        <aside class="dashboard-sidebar therapist-sidebar">
+            <div class="sidebar-header">
+                <div class="user-avatar">
+                    <i class="fas fa-user-md"></i>
+                </div>
+                <div class="user-info">
+                    <h3>Dr. Sarah Chen</h3>
+                    <p>Licensed Therapist</p>
+                </div>
+            </div>
+            
+            <!-- Main Navigation -->
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <h4>Main</h4>
+                    <a href="#dashboard" class="nav-item active" data-tab="dashboard">
+                        <i class="fas fa-tachometer-alt"></i>
+                        <span>Dashboard</span>
+                    </a>
+                    <a href="#assistant" class="nav-item" data-tab="assistant">
+                        <i class="fas fa-robot"></i>
+                        <span>AI Assistant</span>
+                    </a>
+                    <a href="#calendar" class="nav-item" data-tab="calendar">
+                        <i class="fas fa-calendar"></i>
+                        <span>Calendar</span>
+                    </a>
+                    <a href="#profile" class="nav-item" data-tab="profile">
+                        <i class="fas fa-user-circle"></i>
+                        <span>Profile</span>
+                    </a>
+                </div>
+                
+                <div class="nav-section">
+                    <h4>Patient Management</h4>
+                    <a href="#inquiries" class="nav-item" data-tab="inquiries">
+                        <i class="fas fa-inbox"></i>
+                        <span>Inquiries</span>
+                        <span class="badge">3</span>
+                    </a>
+                    <a href="#patients" class="nav-item" data-tab="patients">
+                        <i class="fas fa-users"></i>
+                        <span>Patient List</span>
+                    </a>
+                    <a href="#ai-receptionist" class="nav-item" data-tab="ai-receptionist">
+                        <i class="fas fa-headset"></i>
+                        <span>AI Receptionist</span>
+                    </a>
+                </div>
+                
+                <div class="nav-section">
+                    <h4>Tools</h4>
+                    <a href="#customization" class="nav-item" data-tab="customization">
+                        <i class="fas fa-cog"></i>
+                        <span>Customization</span>
+                    </a>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="dashboard-main">
+            <!-- Dashboard Tab -->
+            <div id="dashboard" class="tab-content active">
+                <div class="tab-header">
+                    <h1>Therapist Dashboard</h1>
+                    <p>Welcome back, Dr. Chen. Here's your practice overview.</p>
+                </div>
+                
+                <div class="dashboard-grid">
+                    <div class="dashboard-card">
+                        <div class="card-header">
+                            <h3>Today's Schedule</h3>
+                            <i class="fas fa-calendar-day"></i>
+                        </div>
+                        <div class="schedule-list">
+                            <div class="schedule-item">
+                                <div class="schedule-time">10:00 AM</div>
+                                <div class="schedule-patient">Sarah Johnson</div>
+                                <div class="schedule-type">Initial Consultation</div>
+                                <div class="schedule-status confirmed">Confirmed</div>
+                            </div>
+                            <div class="schedule-item">
+                                <div class="schedule-time">2:00 PM</div>
+                                <div class="schedule-patient">Michael Rodriguez</div>
+                                <div class="schedule-type">Follow-up Session</div>
+                                <div class="schedule-status confirmed">Confirmed</div>
+                            </div>
+                            <div class="schedule-item">
+                                <div class="schedule-time">4:00 PM</div>
+                                <div class="schedule-patient">Emily Watson</div>
+                                <div class="schedule-type">Therapy Session</div>
+                                <div class="schedule-status pending">Pending</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="dashboard-card">
+                        <div class="card-header">
+                            <h3>Quick Stats</h3>
+                            <i class="fas fa-chart-bar"></i>
+                        </div>
+                        <div class="stats-grid">
+                            <div class="stat-item">
+                                <div class="stat-number">24</div>
+                                <div class="stat-label">Active Patients</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-number">156</div>
+                                <div class="stat-label">Sessions This Month</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-number">3</div>
+                                <div class="stat-label">New Inquiries</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-number">4.8</div>
+                                <div class="stat-label">Average Rating</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="dashboard-card">
+                        <div class="card-header">
+                            <h3>Recent Activity</h3>
+                            <i class="fas fa-history"></i>
+                        </div>
+                        <div class="activity-list">
+                            <div class="activity-item">
+                                <i class="fas fa-user-plus"></i>
+                                <div class="activity-content">
+                                    <p>New patient inquiry from Alex M.</p>
+                                    <span>2 hours ago</span>
+                                </div>
+                            </div>
+                            <div class="activity-item">
+                                <i class="fas fa-calendar-check"></i>
+                                <div class="activity-content">
+                                    <p>Session completed with Sarah J.</p>
+                                    <span>Yesterday</span>
+                                </div>
+                            </div>
+                            <div class="activity-item">
+                                <i class="fas fa-file-alt"></i>
+                                <div class="activity-content">
+                                    <p>Notes updated for Michael R.</p>
+                                    <span>2 days ago</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="dashboard-card">
+                        <div class="card-header">
+                            <h3>AI Assistant Insights</h3>
+                            <i class="fas fa-brain"></i>
+                        </div>
+                        <div class="insights-list">
+                            <div class="insight-item">
+                                <div class="insight-icon">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                </div>
+                                <div class="insight-content">
+                                    <h4>Patient Alert</h4>
+                                    <p>Sarah Johnson's anxiety levels have increased 15% this week.</p>
+                                </div>
+                            </div>
+                            <div class="insight-item">
+                                <div class="insight-icon">
+                                    <i class="fas fa-thumbs-up"></i>
+                                </div>
+                                <div class="insight-content">
+                                    <h4>Positive Progress</h4>
+                                    <p>Michael Rodriguez shows 20% improvement in mood tracking.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI Assistant Tab -->
+            <div id="assistant" class="tab-content">
+                <div class="tab-header">
+                    <h1>AI Assistant</h1>
+                    <p>Your AI-powered assistant for patient management and insights.</p>
+                </div>
+                
+                <div class="assistant-container">
+                    <div class="assistant-sidebar">
+                        <div class="assistant-features">
+                            <h3>Assistant Features</h3>
+                            <div class="feature-list">
+                                <div class="feature-item" onclick="openAssistantFeature('patient-analysis')">
+                                    <i class="fas fa-chart-line"></i>
+                                    <span>Patient Analysis</span>
+                                </div>
+                                <div class="feature-item" onclick="openAssistantFeature('session-prep')">
+                                    <i class="fas fa-clipboard-list"></i>
+                                    <span>Session Preparation</span>
+                                </div>
+                                <div class="feature-item" onclick="openAssistantFeature('treatment-plan')">
+                                    <i class="fas fa-map"></i>
+                                    <span>Treatment Planning</span>
+                                </div>
+                                <div class="feature-item" onclick="openAssistantFeature('progress-tracking')">
+                                    <i class="fas fa-tasks"></i>
+                                    <span>Progress Tracking</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="assistant-quick-actions">
+                            <h3>Quick Actions</h3>
+                            <button class="quick-action-btn" onclick="generateSessionNotes()">
+                                <i class="fas fa-file-alt"></i>
+                                Generate Session Notes
+                            </button>
+                            <button class="quick-action-btn" onclick="analyzePatientData()">
+                                <i class="fas fa-search"></i>
+                                Analyze Patient Data
+                            </button>
+                            <button class="quick-action-btn" onclick="scheduleFollowUp()">
+                                <i class="fas fa-calendar-plus"></i>
+                                Schedule Follow-up
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="assistant-main">
+                        <div class="assistant-chat">
+                            <div class="chat-header">
+                                <h3>AI Assistant Chat</h3>
+                                <div class="chat-status">
+                                    <span class="status-indicator online"></span>
+                                    <span>Online</span>
+                                </div>
+                            </div>
+                            
+                            <div class="chat-messages" id="assistantChatMessages">
+                                <div class="message ai-message">
+                                    <div class="message-avatar">
+                                        <i class="fas fa-robot"></i>
+                                    </div>
+                                    <div class="message-content">
+                                        <p>Hello Dr. Chen! I'm here to help you with patient management, session preparation, and treatment planning. What would you like assistance with today?</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="chat-input-container">
+                                <div class="chat-input">
+                                    <input type="text" id="assistantChatInput" placeholder="Ask me anything about your patients or practice...">
+                                    <button id="assistantSendBtn" onclick="sendAssistantMessage()">
+                                        <i class="fas fa-paper-plane"></i>
+                                    </button>
+                                </div>
+                                <div class="quick-responses">
+                                    <button class="quick-response" onclick="sendQuickAssistantMessage('Show me Sarah Johnson\'s progress')">Show me Sarah Johnson's progress</button>
+                                    <button class="quick-response" onclick="sendQuickAssistantMessage('Prepare notes for today\'s sessions')">Prepare notes for today's sessions</button>
+                                    <button class="quick-response" onclick="sendQuickAssistantMessage('Analyze patient trends this week')">Analyze patient trends this week</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Calendar Tab -->
+            <div id="calendar" class="tab-content">
+                <div class="tab-header">
+                    <h1>Calendar Management</h1>
+                    <p>Manage your availability and schedule sessions with patients.</p>
+                </div>
+                
+                <div class="calendar-container">
+                    <div class="calendar-header">
+                        <button class="calendar-nav" onclick="changeMonth(-1)">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <h2 id="currentMonth">December 2024</h2>
+                        <button class="calendar-nav" onclick="changeMonth(1)">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="calendar-controls">
+                        <button class="btn btn-primary" onclick="openAvailabilityModal()">
+                            <i class="fas fa-plus"></i>
+                            Set Availability
+                        </button>
+                        <button class="btn btn-secondary" onclick="openSessionModal()">
+                            <i class="fas fa-calendar-plus"></i>
+                            Schedule Session
+                        </button>
+                    </div>
+                    
+                    <div class="calendar-grid" id="therapistCalendarGrid">
+                        <!-- Calendar will be generated by JavaScript -->
+                    </div>
+                    
+                    <div class="calendar-legend">
+                        <div class="legend-item">
+                            <div class="legend-color available"></div>
+                            <span>Available</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color booked"></div>
+                            <span>Booked</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color unavailable"></div>
+                            <span>Unavailable</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Profile Tab -->
+            <div id="profile" class="tab-content">
+                <div class="tab-header">
+                    <h1>Professional Profile</h1>
+                    <p>Manage your professional information and credentials.</p>
+                </div>
+                
+                <div class="profile-content">
+                    <div class="profile-card">
+                        <div class="profile-header">
+                            <div class="profile-avatar">
+                                <i class="fas fa-user-md"></i>
+                            </div>
+                            <div class="profile-info">
+                                <h2>Dr. Sarah Chen</h2>
+                                <p>Licensed Clinical Psychologist</p>
+                                <div class="profile-badges">
+                                    <span class="badge verified">Verified</span>
+                                    <span class="badge premium">Premium</span>
+                                </div>
+                            </div>
+                            <button class="edit-profile-btn">Edit Profile</button>
+                        </div>
+                        
+                        <div class="profile-details">
+                            <div class="detail-group">
+                                <h3>Professional Information</h3>
+                                <div class="detail-item">
+                                    <label>License Number:</label>
+                                    <span>LCP-2023-001234</span>
+                                </div>
+                                <div class="detail-item">
+                                    <label>Specialties:</label>
+                                    <span>CBT, Anxiety Disorders, Depression</span>
+                                </div>
+                                <div class="detail-item">
+                                    <label>Experience:</label>
+                                    <span>8 years</span>
+                                </div>
+                                <div class="detail-item">
+                                    <label>Education:</label>
+                                    <span>PhD in Clinical Psychology, Stanford University</span>
+                                </div>
+                            </div>
+                            
+                            <div class="detail-group">
+                                <h3>Practice Information</h3>
+                                <div class="detail-item">
+                                    <label>Session Rate:</label>
+                                    <span>$150/hour</span>
+                                </div>
+                                <div class="detail-item">
+                                    <label>Availability:</label>
+                                    <span>Monday-Friday, 9 AM - 6 PM</span>
+                                </div>
+                                <div class="detail-item">
+                                    <label>Languages:</label>
+                                    <span>English, Mandarin</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="profile-stats-card">
+                        <h3>Practice Statistics</h3>
+                        <div class="stats-grid">
+                            <div class="stat-item">
+                                <div class="stat-number">4.8</div>
+                                <div class="stat-label">Average Rating</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-number">156</div>
+                                <div class="stat-label">Total Sessions</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-number">24</div>
+                                <div class="stat-label">Active Patients</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-number">95%</div>
+                                <div class="stat-label">Patient Retention</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Inquiries Tab -->
+            <div id="inquiries" class="tab-content">
+                <div class="tab-header">
+                    <h1>Patient Inquiries</h1>
+                    <p>Review and respond to new patient inquiries.</p>
+                </div>
+                
+                <div class="inquiries-container">
+                    <div class="inquiries-filters">
+                        <div class="filter-group">
+                            <label>Status:</label>
+                            <select id="statusFilter">
+                                <option value="all">All</option>
+                                <option value="new">New</option>
+                                <option value="reviewed">Reviewed</option>
+                                <option value="responded">Responded</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Priority:</label>
+                            <select id="priorityFilter">
+                                <option value="all">All</option>
+                                <option value="high">High</option>
+                                <option value="medium">Medium</option>
+                                <option value="low">Low</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="inquiries-list">
+                        <div class="inquiry-item new">
+                            <div class="inquiry-header">
+                                <div class="inquiry-patient">
+                                    <h4>Alex Martinez</h4>
+                                    <span class="inquiry-time">2 hours ago</span>
+                                </div>
+                                <div class="inquiry-priority high">High</div>
+                            </div>
+                            <div class="inquiry-content">
+                                <p><strong>Concern:</strong> Severe anxiety and panic attacks</p>
+                                <p><strong>Message:</strong> "I've been experiencing severe anxiety and panic attacks for the past month. I need help urgently as it's affecting my work and relationships."</p>
+                                <p><strong>Preferred Time:</strong> Evenings after 6 PM</p>
+                            </div>
+                            <div class="inquiry-actions">
+                                <button class="btn btn-primary" onclick="respondToInquiry('alex-martinez')">Respond</button>
+                                <button class="btn btn-secondary" onclick="scheduleConsultation('alex-martinez')">Schedule Consultation</button>
+                                <button class="btn btn-outline" onclick="markAsReviewed('alex-martinez')">Mark as Reviewed</button>
+                            </div>
+                        </div>
+                        
+                        <div class="inquiry-item reviewed">
+                            <div class="inquiry-header">
+                                <div class="inquiry-patient">
+                                    <h4>Maria Rodriguez</h4>
+                                    <span class="inquiry-time">1 day ago</span>
+                                </div>
+                                <div class="inquiry-priority medium">Medium</div>
+                            </div>
+                            <div class="inquiry-content">
+                                <p><strong>Concern:</strong> Depression and relationship issues</p>
+                                <p><strong>Message:</strong> "I've been feeling depressed and having trouble in my relationship. I think I need professional help."</p>
+                                <p><strong>Preferred Time:</strong> Weekday mornings</p>
+                            </div>
+                            <div class="inquiry-actions">
+                                <button class="btn btn-primary" onclick="respondToInquiry('maria-rodriguez')">Respond</button>
+                                <button class="btn btn-secondary" onclick="scheduleConsultation('maria-rodriguez')">Schedule Consultation</button>
+                                <button class="btn btn-outline" onclick="markAsReviewed('maria-rodriguez')">Mark as Reviewed</button>
+                            </div>
+                        </div>
+                        
+                        <div class="inquiry-item responded">
+                            <div class="inquiry-header">
+                                <div class="inquiry-patient">
+                                    <h4>David Kim</h4>
+                                    <span class="inquiry-time">3 days ago</span>
+                                </div>
+                                <div class="inquiry-priority low">Low</div>
+                            </div>
+                            <div class="inquiry-content">
+                                <p><strong>Concern:</strong> Work stress and burnout</p>
+                                <p><strong>Message:</strong> "I'm experiencing high levels of work stress and feeling burned out. Looking for strategies to manage this."</p>
+                                <p><strong>Preferred Time:</strong> Flexible</p>
+                            </div>
+                            <div class="inquiry-actions">
+                                <button class="btn btn-primary" onclick="respondToInquiry('david-kim')">Respond</button>
+                                <button class="btn btn-secondary" onclick="scheduleConsultation('david-kim')">Schedule Consultation</button>
+                                <button class="btn btn-outline" onclick="markAsReviewed('david-kim')">Mark as Reviewed</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Patient List Tab -->
+            <div id="patients" class="tab-content">
+                <div class="tab-header">
+                    <h1>Patient List</h1>
+                    <p>Manage your active patients and their treatment progress.</p>
+                </div>
+                
+                <div class="patients-container">
+                    <div class="patients-search">
+                        <input type="text" placeholder="Search patients..." id="patientSearch">
+                        <button class="btn btn-primary" onclick="addNewPatient()">
+                            <i class="fas fa-plus"></i>
+                            Add Patient
+                        </button>
+                    </div>
+                    
+                    <div class="patients-list">
+                        <div class="patient-item">
+                            <div class="patient-header">
+                                <div class="patient-info">
+                                    <div class="patient-avatar">
+                                        <i class="fas fa-user"></i>
+                                    </div>
+                                    <div class="patient-details">
+                                        <h4>Sarah Johnson</h4>
+                                        <p>Anxiety, Stress Management</p>
+                                        <span class="patient-status active">Active</span>
+                                    </div>
+                                </div>
+                                <div class="patient-actions">
+                                    <button class="action-btn" onclick="viewPatientDetails('sarah-johnson')">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="action-btn" onclick="editPatientNotes('sarah-johnson')">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="patient-progress">
+                                <div class="progress-item">
+                                    <label>Next Session:</label>
+                                    <span>Tomorrow, 2:00 PM</span>
+                                </div>
+                                <div class="progress-item">
+                                    <label>Progress:</label>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: 75%"></div>
+                                    </div>
+                                    <span>75%</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="patient-item">
+                            <div class="patient-header">
+                                <div class="patient-info">
+                                    <div class="patient-avatar">
+                                        <i class="fas fa-user"></i>
+                                    </div>
+                                    <div class="patient-details">
+                                        <h4>Michael Rodriguez</h4>
+                                        <p>Depression, CBT</p>
+                                        <span class="patient-status active">Active</span>
+                                    </div>
+                                </div>
+                                <div class="patient-actions">
+                                    <button class="action-btn" onclick="viewPatientDetails('michael-rodriguez')">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="action-btn" onclick="editPatientNotes('michael-rodriguez')">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="patient-progress">
+                                <div class="progress-item">
+                                    <label>Next Session:</label>
+                                    <span>Friday, 10:00 AM</span>
+                                </div>
+                                <div class="progress-item">
+                                    <label>Progress:</label>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: 60%"></div>
+                                    </div>
+                                    <span>60%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI Receptionist Tab -->
+            <div id="ai-receptionist" class="tab-content">
+                <div class="tab-header">
+                    <h1>AI Receptionist</h1>
+                    <p>Configure and monitor your AI receptionist for handling first-time patients.</p>
+                </div>
+                
+                <div class="receptionist-container">
+                    <div class="receptionist-status">
+                        <div class="status-card">
+                            <div class="status-header">
+                                <h3>AI Receptionist Status</h3>
+                                <div class="status-toggle">
+                                    <label class="switch">
+                                        <input type="checkbox" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="status-info">
+                                <div class="status-item">
+                                    <span class="status-label">Status:</span>
+                                    <span class="status-value active">Active</span>
+                                </div>
+                                <div class="status-item">
+                                    <span class="status-label">Conversations Today:</span>
+                                    <span class="status-value">12</span>
+                                </div>
+                                <div class="status-item">
+                                    <span class="status-label">Successful Bookings:</span>
+                                    <span class="status-value">8</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="receptionist-config">
+                        <div class="config-section">
+                            <h3>Greeting Message</h3>
+                            <textarea placeholder="Enter your AI receptionist's greeting message...">Hello! I'm Dr. Chen's AI assistant. I'm here to help you get started with mental health support. How can I assist you today?</textarea>
+                        </div>
+                        
+                        <div class="config-section">
+                            <h3>Available Services</h3>
+                            <div class="service-list">
+                                <label class="service-item">
+                                    <input type="checkbox" checked>
+                                    <span>Initial Consultation Booking</span>
+                                </label>
+                                <label class="service-item">
+                                    <input type="checkbox" checked>
+                                    <span>Basic Mental Health Assessment</span>
+                                </label>
+                                <label class="service-item">
+                                    <input type="checkbox" checked>
+                                    <span>Emergency Resource Provision</span>
+                                </label>
+                                <label class="service-item">
+                                    <input type="checkbox">
+                                    <span>Insurance Verification</span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="config-section">
+                            <h3>Escalation Rules</h3>
+                            <div class="escalation-rules">
+                                <div class="rule-item">
+                                    <label>Escalate to human if:</label>
+                                    <select>
+                                        <option>Patient mentions self-harm</option>
+                                        <option>Patient requests human therapist</option>
+                                        <option>Complex insurance questions</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="config-actions">
+                            <button class="btn btn-primary">Save Configuration</button>
+                            <button class="btn btn-secondary">Test AI Receptionist</button>
+                        </div>
+                    </div>
+                    
+                    <div class="receptionist-logs">
+                        <h3>Recent Conversations</h3>
+                        <div class="logs-list">
+                            <div class="log-item">
+                                <div class="log-header">
+                                    <span class="log-patient">Alex Martinez</span>
+                                    <span class="log-time">2 hours ago</span>
+                                    <span class="log-status completed">Completed</span>
+                                </div>
+                                <div class="log-summary">
+                                    Initial consultation booked for tomorrow 6:00 PM. Patient reported severe anxiety.
+                                </div>
+                            </div>
+                            <div class="log-item">
+                                <div class="log-header">
+                                    <span class="log-patient">Maria Rodriguez</span>
+                                    <span class="log-time">1 day ago</span>
+                                    <span class="log-status completed">Completed</span>
+                                </div>
+                                <div class="log-summary">
+                                    Basic assessment completed. Patient interested in depression treatment.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Customization Tab -->
+            <div id="customization" class="tab-content">
+                <div class="tab-header">
+                    <h1>Dashboard Customization</h1>
+                    <p>Customize your dashboard preferences and settings.</p>
+                </div>
+                
+                <div class="customization-container">
+                    <div class="customization-section">
+                        <h3>Dashboard Layout</h3>
+                        <div class="layout-options">
+                            <label class="layout-option">
+                                <input type="radio" name="layout" value="compact" checked>
+                                <span>Compact Layout</span>
+                            </label>
+                            <label class="layout-option">
+                                <input type="radio" name="layout" value="spacious">
+                                <span>Spacious Layout</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="customization-section">
+                        <h3>Default Views</h3>
+                        <div class="view-settings">
+                            <div class="setting-item">
+                                <label>Default Dashboard Tab:</label>
+                                <select>
+                                    <option>Dashboard</option>
+                                    <option>Calendar</option>
+                                    <option>Patients</option>
+                                    <option>Inquiries</option>
+                                </select>
+                            </div>
+                            <div class="setting-item">
+                                <label>Calendar View:</label>
+                                <select>
+                                    <option>Month</option>
+                                    <option>Week</option>
+                                    <option>Day</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="customization-section">
+                        <h3>Notifications</h3>
+                        <div class="notification-settings">
+                            <label class="setting-item">
+                                <input type="checkbox" checked>
+                                <span>New patient inquiries</span>
+                            </label>
+                            <label class="setting-item">
+                                <input type="checkbox" checked>
+                                <span>Upcoming sessions</span>
+                            </label>
+                            <label class="setting-item">
+                                <input type="checkbox">
+                                <span>Patient progress updates</span>
+                            </label>
+                            <label class="setting-item">
+                                <input type="checkbox" checked>
+                                <span>System maintenance alerts</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="customization-actions">
+                        <button class="btn btn-primary">Save Preferences</button>
+                        <button class="btn btn-secondary">Reset to Defaults</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+    <script src="therapist-dashboard.js"></script>
+</body>
+</html>

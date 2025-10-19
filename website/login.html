@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - V-Kare</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <h2>V-Kare</h2>
+            </div>
+            <div class="nav-menu" id="nav-menu">
+                <a href="index.html" class="nav-link">Home</a>
+                <a href="about.html" class="nav-link">About Us</a>
+                <a href="resources.html" class="nav-link">Resources</a>
+                <a href="login.html" class="nav-link login-btn active">Login</a>
+            </div>
+            <div class="hamburger" id="hamburger">
+                <span class="bar"></span>
+                <span class="bar"></span>
+                <span class="bar"></span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Login Section -->
+    <section class="login-section">
+        <div class="container">
+            <div class="login-container">
+                <div class="login-header">
+                    <h1>Welcome to V-Kare</h1>
+                    <p>Please choose your role and sign in to continue</p>
+                </div>
+
+                <!-- Role Selection -->
+                <div class="role-selection" id="role-selection">
+                    <h2>I am a...</h2>
+                    <div class="role-cards">
+                        <div class="role-card" data-role="user">
+                            <div class="role-icon">
+                                <i class="fas fa-user"></i>
+                            </div>
+                            <h3>Patient/User</h3>
+                            <p>I'm looking for mental health support and therapy services</p>
+                            <ul>
+                                <li>AI-powered therapy sessions</li>
+                                <li>Connect with licensed therapists</li>
+                                <li>Track your mental health journey</li>
+                                <li>Access to community support</li>
+                            </ul>
+                        </div>
+                        <div class="role-card" data-role="therapist">
+                            <div class="role-icon">
+                                <i class="fas fa-user-md"></i>
+                            </div>
+                            <h3>Therapist</h3>
+                            <p>I'm a licensed mental health professional</p>
+                            <ul>
+                                <li>Manage patient sessions</li>
+                                <li>AI-powered assistant tools</li>
+                                <li>Schedule and calendar management</li>
+                                <li>Patient progress tracking</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Login Forms -->
+                <div class="login-forms" id="login-forms" style="display: none;">
+                    <!-- User Login Form -->
+                    <div class="login-form" id="user-login-form" style="display: none;">
+                        <div class="form-header">
+                            <button class="back-btn" onclick="showRoleSelection()">
+                                <i class="fas fa-arrow-left"></i> Back
+                            </button>
+                            <h2>Patient Login</h2>
+                        </div>
+                        <form id="userForm">
+                            <div class="form-group">
+                                <label for="userEmail">Email Address</label>
+                                <input type="email" id="userEmail" name="email" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="userPassword">Password</label>
+                                <input type="password" id="userPassword" name="password" required>
+                            </div>
+                            <div class="form-options">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="remember">
+                                    <span class="checkmark"></span>
+                                    Remember me
+                                </label>
+                                <a href="#" class="forgot-password">Forgot password?</a>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-full">Sign In</button>
+                            <div class="form-footer">
+                                <p>Don't have an account? <a href="#" onclick="showSignup('user')">Sign up here</a></p>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Therapist Login Form -->
+                    <div class="login-form" id="therapist-login-form" style="display: none;">
+                        <div class="form-header">
+                            <button class="back-btn" onclick="showRoleSelection()">
+                                <i class="fas fa-arrow-left"></i> Back
+                            </button>
+                            <h2>Therapist Login</h2>
+                        </div>
+                        <form id="therapistForm">
+                            <div class="form-group">
+                                <label for="therapistEmail">Professional Email</label>
+                                <input type="email" id="therapistEmail" name="email" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="therapistPassword">Password</label>
+                                <input type="password" id="therapistPassword" name="password" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="licenseNumber">License Number</label>
+                                <input type="text" id="licenseNumber" name="license" required>
+                            </div>
+                            <div class="form-options">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="remember">
+                                    <span class="checkmark"></span>
+                                    Remember me
+                                </label>
+                                <a href="#" class="forgot-password">Forgot password?</a>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-full">Sign In</button>
+                            <div class="form-footer">
+                                <p>Don't have an account? <a href="#" onclick="showSignup('therapist')">Apply to join</a></p>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Signup Forms -->
+                <div class="signup-forms" id="signup-forms" style="display: none;">
+                    <!-- User Signup Form -->
+                    <div class="signup-form" id="user-signup-form" style="display: none;">
+                        <div class="form-header">
+                            <button class="back-btn" onclick="showRoleSelection()">
+                                <i class="fas fa-arrow-left"></i> Back
+                            </button>
+                            <h2>Create Patient Account</h2>
+                        </div>
+                        <form id="userSignupForm">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="userFirstName">First Name</label>
+                                    <input type="text" id="userFirstName" name="firstName" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="userLastName">Last Name</label>
+                                    <input type="text" id="userLastName" name="lastName" required>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="userSignupEmail">Email Address</label>
+                                <input type="email" id="userSignupEmail" name="email" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="userSignupPassword">Password</label>
+                                <input type="password" id="userSignupPassword" name="password" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="userConfirmPassword">Confirm Password</label>
+                                <input type="password" id="userConfirmPassword" name="confirmPassword" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="userAge">Age</label>
+                                <input type="number" id="userAge" name="age" min="13" max="120" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="userPhone">Phone Number (Optional)</label>
+                                <input type="tel" id="userPhone" name="phone">
+                            </div>
+                            <div class="form-options">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="terms" required>
+                                    <span class="checkmark"></span>
+                                    I agree to the <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>
+                                </label>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-full">Create Account</button>
+                            <div class="form-footer">
+                                <p>Already have an account? <a href="#" onclick="showLogin('user')">Sign in here</a></p>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Therapist Signup Form -->
+                    <div class="signup-form" id="therapist-signup-form" style="display: none;">
+                        <div class="form-header">
+                            <button class="back-btn" onclick="showRoleSelection()">
+                                <i class="fas fa-arrow-left"></i> Back
+                            </button>
+                            <h2>Therapist Application</h2>
+                        </div>
+                        <form id="therapistSignupForm">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="therapistFirstName">First Name</label>
+                                    <input type="text" id="therapistFirstName" name="firstName" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="therapistLastName">Last Name</label>
+                                    <input type="text" id="therapistLastName" name="lastName" required>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="therapistSignupEmail">Professional Email</label>
+                                <input type="email" id="therapistSignupEmail" name="email" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="therapistSignupPassword">Password</label>
+                                <input type="password" id="therapistSignupPassword" name="password" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="therapistConfirmPassword">Confirm Password</label>
+                                <input type="password" id="therapistConfirmPassword" name="confirmPassword" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="therapistLicense">License Number</label>
+                                <input type="text" id="therapistLicense" name="license" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="therapistSpecialty">Specialty</label>
+                                <select id="therapistSpecialty" name="specialty" required>
+                                    <option value="">Select your specialty</option>
+                                    <option value="general">General Practice</option>
+                                    <option value="cbt">Cognitive Behavioral Therapy</option>
+                                    <option value="dbt">Dialectical Behavior Therapy</option>
+                                    <option value="trauma">Trauma Therapy</option>
+                                    <option value="anxiety">Anxiety Disorders</option>
+                                    <option value="depression">Depression</option>
+                                    <option value="couples">Couples Therapy</option>
+                                    <option value="family">Family Therapy</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="therapistExperience">Years of Experience</label>
+                                <input type="number" id="therapistExperience" name="experience" min="0" max="50" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="therapistBio">Professional Bio</label>
+                                <textarea id="therapistBio" name="bio" rows="4" placeholder="Tell us about your background and approach to therapy..."></textarea>
+                            </div>
+                            <div class="form-options">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="terms" required>
+                                    <span class="checkmark"></span>
+                                    I agree to the <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>
+                                </label>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-full">Submit Application</button>
+                            <div class="form-footer">
+                                <p>Already have an account? <a href="#" onclick="showLogin('therapist')">Sign in here</a></p>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>V-Kare</h3>
+                    <p>Your trusted AI-powered mental health companion, providing 24/7 support and connecting you with licensed therapists.</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Quick Links</h4>
+                    <ul>
+                        <li><a href="index.html">Home</a></li>
+                        <li><a href="about.html">About Us</a></li>
+                        <li><a href="resources.html">Resources</a></li>
+                        <li><a href="login.html">Login</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Support</h4>
+                    <ul>
+                        <li><a href="#faqs">FAQs</a></li>
+                        <li><a href="#contact">Contact Us</a></li>
+                        <li><a href="#privacy">Privacy Policy</a></li>
+                        <li><a href="#terms">Terms of Service</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Connect</h4>
+                    <div class="social-links">
+                        <a href="#"><i class="fab fa-facebook"></i></a>
+                        <a href="#"><i class="fab fa-twitter"></i></a>
+                        <a href="#"><i class="fab fa-linkedin"></i></a>
+                        <a href="#"><i class="fab fa-instagram"></i></a>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 V-Kare. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+    <script src="login.js"></script>
+</body>
+</html>
