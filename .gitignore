@@ -25,6 +25,8 @@ logs/
 
 # Environment variables
 .env
+.env.production
+services/orchestrator/.venv/
 .env.local
 .env.development.local
 .env.test.local
