@@ -1,71 +1,136 @@
 # AWS Deployment Guide for Vkare AI Therapy Platform
 
 ## Overview
-This guide will walk you through deploying your Vkare application on AWS using **EC2 with Docker Compose**. This is the simplest approach with minimal code changes, leveraging your existing containerized architecture.
+This guide documents the **actual deployment process** used to deploy the Vkare AI therapy platform on AWS. This is a step-by-step walkthrough from scratch to a fully functional production system.
 
-**Domain:** v-kare.co.in
-**Architecture:** 6 Docker containers running on a single EC2 instance behind Application Load Balancer
+**Final Result:** https://v-kare.co.in (Live and accessible worldwide!)
+
+**Deployment Method:** EC2 with Docker Compose + Direct SSL (Let's Encrypt)
+**Total Time:** ~2-3 hours
+**Cost:** ~$1/month (first year on free tier)
 
 ---
 
 ## Table of Contents
 1. [Prerequisites](#prerequisites)
 2. [Architecture Overview](#architecture-overview)
-3. [Changes Made to Codebase](#changes-made-to-codebase)
-4. [Step-by-Step Deployment](#step-by-step-deployment)
-5. [Post-Deployment Configuration](#post-deployment-configuration)
-6. [Cost Estimate](#cost-estimate)
-7. [Troubleshooting](#troubleshooting)
+3. [Code Changes Required](#code-changes-required)
+4. [Phase 1: Setup AWS EC2 Instance](#phase-1-setup-aws-ec2-instance-30-minutes)
+5. [Phase 2: Deploy Application](#phase-2-deploy-application-20-minutes)
+6. [Phase 3: Setup Domain and SSL](#phase-3-setup-domain-and-ssl-60-minutes)
+7. [Post-Deployment](#post-deployment)
+8. [Monitoring and Maintenance](#monitoring-and-maintenance)
+9. [Troubleshooting](#troubleshooting)
+10. [Team Member Checklist](#team-member-checklist)
 
 ---
 
 ## Prerequisites
 
 Before starting, ensure you have:
-- ✅ AWS Account with billing enabled
-- ✅ Domain name: **v-kare.co.in** (already purchased)
-- ✅ Azure OpenAI API keys (GPT-5 & Whisper)
+
+### 1. AWS Account
+- ✅ Active AWS account (sign up at https://aws.amazon.com)
+- ✅ Payment method added (credit card)
+- ✅ Free tier available (first 12 months)
+- ✅ AWS Console access
+
+### 2. Domain Name
+- ✅ Domain purchased (we used v-kare.co.in from GoDaddy)
+- ✅ Access to domain DNS management
+
+### 3. API Keys
+- ✅ Azure OpenAI GPT-5 endpoint and key
+- ✅ Azure OpenAI Whisper endpoint and key
 - ✅ Maya Research TTS API key
-- ✅ Basic familiarity with AWS Console
-- ✅ SSH client installed on your computer
+
+### 4. Local Tools
+- ✅ SSH client (Windows 10+ has built-in OpenSSH)
+- ✅ Git installed (optional, for cloning repo)
+- ✅ Code editor (VS Code, Notepad++, etc.)
+
+### 5. GitHub Repository
+- ✅ Code pushed to GitHub on AWS branch
+- ✅ Repository is public (or have GitHub token ready)
 
 ---
 
 ## Architecture Overview
 
+### Final Production Architecture
+
 ```
-Internet
-    │
-    ▼
-Route 53 (DNS)
-    │
-    ▼
-Application Load Balancer (HTTPS/HTTP)
-    │
-    ├──► Target Group (Port 80) ──► EC2 Instance
-    │                                   │
-    │                                   ├─ Nginx (Port 80)
-    │                                   ├─ Orchestrator (Port 8000)
-    │                                   ├─ STT Service (Port 8001)
-    │                                   ├─ LLM Service (Port 8002)
-    │                                   ├─ TTS Service (Port 8003)
-    │                                   ├─ Backend (Port 9000)
-    │                                   └─ SQLite Database
+┌─────────────────────────────────────────────────────────────┐
+│                         INTERNET                            │
+│                  (Users worldwide)                          │
+└──────────────────────┬──────────────────────────────────────┘
+                       │
+                       ▼
+            ┌──────────────────────┐
+            │   GoDaddy DNS        │
+            │  v-kare.co.in        │
+            │  A → 13.61.186.207   │
+            └──────────┬───────────┘
+                       │
+                       ▼
+            ┌──────────────────────┐
+            │   AWS EC2 Instance   │
+            │   m7i-flex.large     │
+            │   Ubuntu 24.04       │
+            │   Public IP          │
+            └──────────┬───────────┘
+                       │
+                       ▼
+            ┌──────────────────────┐
+            │  Nginx (Host)        │
+            │  - SSL Termination   │
+            │  - Port 443 → 8085   │
+            │  - Let's Encrypt     │
+            └──────────┬───────────┘
+                       │
+                       ▼
+        ┌──────────────────────────────┐
+        │    Docker Compose            │
+        │                              │
+        │  ┌────────────────────────┐  │
+        │  │ Nginx Container :8085  │  │
+        │  │ (Static Files/Proxy)   │  │
+        │  └───┬────────────────────┘  │
+        │      │                       │
+        │  ┌───┴────────┬──────────┐   │
+        │  │            │          │   │
+        │  ▼            ▼          ▼   │
+        │ Backend   Orchestrator  ...  │
+        │  :9000       :8000           │
+        │                              │
+        │ STT(:8001) LLM(:8002)        │
+        │ TTS(:8003)                   │
+        └──────────────────────────────┘
 ```
 
-**Services:**
-1. **EC2 Instance**: Hosts all Docker containers
-2. **Application Load Balancer**: Handles SSL/TLS and routes traffic
-3. **Route 53**: DNS management for v-kare.co.in
-4. **VPC**: Default VPC with security groups
-5. **ACM Certificate**: Free SSL certificate for HTTPS
+### Why This Architecture?
+
+**We initially planned to use Application Load Balancer (ALB)**, but encountered this error:
+> "This AWS account currently does not support creating load balancers"
+
+**Solution:** We used **direct SSL on EC2** with Let's Encrypt instead. This approach:
+- ✅ Works immediately (no AWS support ticket needed)
+- ✅ Still provides HTTPS and SSL certificate
+- ✅ Free SSL from Let's Encrypt
+- ✅ Simpler setup
+- ✅ Lower cost
+- ⚠️ Single point of failure (but fine for MVP)
 
 ---
 
-## Changes Made to Codebase
+## Code Changes Required
 
-### 1. **nginx.conf** ([website/nginx.conf](website/nginx.conf))
-**Change:** Added production domain to server_name directive
+Before deployment, we made minimal changes to the codebase:
+
+### 1. Updated `website/nginx.conf`
+
+**File:** `website/nginx.conf`
+**Line:** 3
 
 **Before:**
 ```nginx
@@ -77,145 +142,220 @@ server_name localhost;
 server_name localhost v-kare.co.in www.v-kare.co.in;
 ```
 
-**Why:** Nginx needs to recognize your domain name to properly serve requests. This tells Nginx to respond to requests for both the root domain and www subdomain.
+**Why:** Nginx needs to recognize your production domain names.
 
 ---
 
-### 2. **config.js** ([website/config.js](website/config.js))
-**Change:** Updated API configuration with clear instructions
+### 2. Updated `website/config.js`
 
-**Before:**
+**File:** `website/config.js`
+
+**Created new file with:**
 ```javascript
-BACKEND_URL: 'https://your-backend-alb-url.region.elb.amazonaws.com',
-ORCHESTRATOR_URL: 'https://your-orchestrator-alb-url.region.elb.amazonaws.com'
+// API Configuration
+// For local development, keep these empty to use relative paths through nginx
+// For AWS production, update these with your Application Load Balancer DNS names
+window.API_CONFIG = {
+    // Leave empty for local development (uses nginx proxy)
+    // For AWS: Update with ALB DNS after deployment, e.g., 'http://vkare-alb-xxxxxxxxx.us-east-1.elb.amazonaws.com'
+    BACKEND_URL: '',
+    ORCHESTRATOR_URL: ''
+};
 ```
 
-**After:**
-```javascript
-BACKEND_URL: '',
-ORCHESTRATOR_URL: ''
+**Why:** Empty values use relative paths through Nginx proxy, simplifying deployment.
+
+---
+
+### 3. Created `.env.production`
+
+**File:** `.env.production`
+
+**Contains:** Same as your `.env` file with all API keys
+
+**IMPORTANT:** This file is in `.gitignore` and should NEVER be committed to Git!
+
+---
+
+### 4. Updated `.gitignore`
+
+**File:** `.gitignore`
+
+**Added line 28:**
+```
+.env.production
 ```
 
-**Why:** Empty values use relative paths through Nginx proxy (simpler setup). Since Nginx handles all routing, the frontend doesn't need to know about backend URLs. Everything goes through the same domain (v-kare.co.in).
+**Why:** Protects your API keys from being exposed in GitHub.
 
 ---
 
-### 3. **.env.production** (New File)
-**Change:** Created production environment file
+### 5. Created `docker-compose.prod.yml`
 
-**Purpose:** Contains all your API keys and configuration for production deployment. This separates development and production credentials.
+**File:** `docker-compose.prod.yml`
 
-**Why:** Keeps production secrets separate from development. You'll upload this to your EC2 instance.
-
----
-
-### 4. **docker-compose.prod.yml** (New File)
-**Change:** Created production Docker Compose configuration
-
-**Key Differences from Development:**
-- ✅ Removed `--reload` flag (production doesn't need hot-reloading)
-- ✅ Removed volume mounts (no live code editing in production)
-- ✅ Changed ALLOWED_ORIGINS to use v-kare.co.in
+**Key differences from `docker-compose.yml`:**
+- ✅ No `--reload` flag (production doesn't need hot-reloading)
+- ✅ No volume mounts (code is baked into images)
 - ✅ Added `restart: unless-stopped` (auto-restart on crashes)
-- ✅ Changed nginx port from 8085 to 80 (standard HTTP port)
-
-**Why:** Production environments need stability and security, not development features like live reloading.
+- ✅ Changed ALLOWED_ORIGINS to production domain
+- ✅ Nginx port changed from 8085 to 80 (initially), then to 8085 (after adding host Nginx)
 
 ---
 
-## Step-by-Step Deployment
+## Phase 1: Setup AWS EC2 Instance (30 minutes)
 
-### **PHASE 1: Setup AWS Environment (30 minutes)**
-
-#### Step 1.1: Create EC2 Instance
+### Step 1.1: Create EC2 Instance
 
 1. **Login to AWS Console**
    - Go to https://console.aws.amazon.com
-   - Navigate to **EC2** service (search for "EC2" in top search bar)
+   - Sign in with your AWS account
 
-2. **Launch Instance**
-   - Click **"Launch Instance"** (orange button)
-   - **Name:** `vkare-production-server`
+2. **Navigate to EC2**
+   - In the search bar at the top, type "EC2"
+   - Click on **EC2** (Virtual Servers in the Cloud)
 
-3. **Choose AMI (Operating System)**
-   - Select: **Ubuntu Server 24.04 LTS** (Free tier eligible)
+3. **Launch Instance**
+   - Click the orange **"Launch Instance"** button
+   - Instance name: `vkare-production-server`
+
+4. **Choose AMI (Operating System)**
+   - Select: **Ubuntu Server 24.04 LTS**
+   - Make sure it says "Free tier eligible"
    - Architecture: **64-bit (x86)**
 
-4. **Choose Instance Type**
-   - Select: **m7i-flex.large** (2 vCPU, 8 GB RAM) ✅ **FREE TIER ELIGIBLE**
-   - Why: Your app has 6 services running simultaneously, needs at least 8GB RAM
-   - Alternative if m7i-flex not available: **t3.large** (not free tier, ~$60/month)
-   - ⚠️ **DO NOT use t3.micro or t3.small** - Not enough memory, will crash!
+5. **Choose Instance Type**
+   - **IMPORTANT:** Select **m7i-flex.large** (2 vCPU, 8 GB RAM)
+   - ✅ **This is FREE TIER ELIGIBLE**
 
-5. **Create Key Pair (for SSH access)**
+   **Why we need 8GB RAM:**
+   - Your app runs 6 Docker containers simultaneously
+   - Minimum memory requirement: ~2.5-3 GB
+   - Recommended: 8 GB for stability under load
+
+   **Instance comparison:**
+   | Instance Type | vCPU | RAM | Free Tier? | Will it work? |
+   |---------------|------|-----|------------|---------------|
+   | t3.micro | 2 | 1 GB | ✅ Yes | ❌ NO - Too small |
+   | t3.small | 2 | 2 GB | ✅ Yes | ❌ NO - Unstable |
+   | c7i-flex.large | 2 | 4 GB | ✅ Yes | ⚠️ Maybe - Struggles |
+   | **m7i-flex.large** | 2 | 8 GB | ✅ **Yes** | ✅ **YES - Recommended!** |
+   | t3.large | 2 | 8 GB | ❌ No | ✅ Yes - But $60/month |
+
+6. **Create Key Pair (SSH Access)**
    - Click **"Create new key pair"**
    - Name: `vkare-key`
    - Type: **RSA**
-   - Format: **PEM** (for Mac/Linux) or **PPK** (for Windows/PuTTY)
+   - Format:
+     - **PEM** (for Windows 10+, Mac, Linux) ← **Recommended**
+     - **PPK** (only if using PuTTY)
    - Click **"Create key pair"**
-   - **IMPORTANT:** Save the downloaded `.pem` file securely (you'll need it to connect)
+   - **IMPORTANT:** The `.pem` file will download automatically
+   - **Save it securely!** (e.g., `C:\Users\YourName\Downloads\vkare-key.pem`)
+   - You'll need this file to connect via SSH
 
-6. **Configure Network Settings**
+7. **Configure Network Settings**
    - Click **"Edit"** next to Network settings
    - **VPC:** Keep default VPC
-   - **Auto-assign Public IP:** Enable
+   - **Auto-assign Public IP:** **Enable**
    - **Firewall (Security Group):**
      - Click **"Create security group"**
-     - Name: `vkare-sg`
+     - Security group name: `vkare-sg`
      - Description: `Security group for Vkare application`
-     - **Add these rules:**
 
-       | Type | Protocol | Port | Source | Description |
-       |------|----------|------|--------|-------------|
-       | SSH | TCP | 22 | My IP | SSH access from your IP |
-       | HTTP | TCP | 80 | Anywhere (0.0.0.0/0) | Web traffic |
-       | HTTPS | TCP | 443 | Anywhere (0.0.0.0/0) | Secure web traffic |
-       | Custom TCP | TCP | 8000-8003 | My IP | Development access (optional) |
-       | Custom TCP | TCP | 9000 | My IP | Backend access (optional) |
+   **Add Inbound Rules:**
 
-7. **Configure Storage**
+   Click **"Add security group rule"** for each:
+
+   | Type | Protocol | Port Range | Source Type | Source | Description |
+   |------|----------|------------|-------------|--------|-------------|
+   | SSH | TCP | 22 | My IP | (auto-detected) | SSH access |
+   | HTTP | TCP | 80 | Anywhere | 0.0.0.0/0 | Web traffic |
+   | HTTPS | TCP | 443 | Anywhere | 0.0.0.0/0 | Secure web traffic |
+
+   **IMPORTANT:** The SSH rule should use "My IP" to restrict access to only your computer. The other rules use "Anywhere" so anyone can visit your website.
+
+8. **Configure Storage**
    - Size: **30 GB** (minimum)
    - Volume Type: **gp3** (General Purpose SSD)
-   - Why: Application files + Docker images need ~20GB
+   - Why: Docker images + application files need ~20GB
 
-8. **Review and Launch**
-   - Click **"Launch instance"**
-   - Wait 2-3 minutes for instance to start
-   - Click **"View Instances"**
-   - Note down the **Public IPv4 address** (e.g., 54.123.45.67)
+9. **Review and Launch**
+   - Click **"Launch instance"** (orange button)
+   - You'll see "Successfully initiated launch of instance"
+   - Click **"View all instances"**
 
----
+10. **Wait for Instance to Start**
+    - Status will show "Pending" → then "Running" (takes 2-3 minutes)
+    - **Instance State:** Should be green "Running"
+    - **Status Check:** Wait until it shows "2/2 checks passed"
 
-#### Step 1.2: Connect to EC2 Instance
-
-**For Mac/Linux:**
-```bash
-# Change permissions on key file
-chmod 400 ~/Downloads/vkare-key.pem
-
-# Connect to instance (replace with YOUR public IP)
-ssh -i ~/Downloads/vkare-key.pem ubuntu@54.123.45.67
-```
-
-**For Windows (using PowerShell):**
-```powershell
-# Connect to instance (replace with YOUR public IP)
-ssh -i C:\Users\YourName\Downloads\vkare-key.pem ubuntu@54.123.45.67
-```
-
-**For Windows (using PuTTY):**
-1. Open PuTTY
-2. Host Name: `ubuntu@54.123.45.67`
-3. Connection → SSH → Auth → Browse and select your `.ppk` file
-4. Click **"Open"**
-
-You should see: `ubuntu@ip-xxx-xxx-xxx-xxx:~$`
+11. **Note Your Public IP**
+    - Click on your instance
+    - In the details below, find **Public IPv4 address**
+    - Example: `13.61.186.207`
+    - **Write this down!** You'll need it throughout deployment
 
 ---
 
-#### Step 1.3: Install Docker and Docker Compose
+### Step 1.2: Connect to EC2 Instance via SSH
 
-Run these commands one by one in your SSH terminal:
+#### For Windows 10/11 (PowerShell):
+
+1. **Open PowerShell**
+   - Press `Windows + X`
+   - Click **"Windows PowerShell"** or **"Terminal"**
+
+2. **Change to Downloads folder**
+   ```powershell
+   cd C:\Users\YourName\Downloads
+   ```
+
+3. **Connect via SSH**
+   ```powershell
+   ssh -i vkare-key.pem ubuntu@YOUR_EC2_PUBLIC_IP
+   ```
+
+   **Replace `YOUR_EC2_PUBLIC_IP`** with your actual IP (e.g., `13.61.186.207`)
+
+   **Example:**
+   ```powershell
+   ssh -i vkare-key.pem ubuntu@13.61.186.207
+   ```
+
+4. **First time connection warning**
+   - You'll see: "The authenticity of host... Are you sure you want to continue?"
+   - Type: `yes` and press Enter
+
+5. **You're connected!**
+   - You should see: `ubuntu@ip-xxx-xxx-xxx-xxx:~$`
+
+#### Troubleshooting SSH Connection:
+
+**Problem:** "Connection timed out"
+
+**Cause:** Security group not allowing SSH from your IP
+
+**Solution:**
+1. Go to EC2 → Security Groups
+2. Select `vkare-sg`
+3. Edit inbound rules
+4. For SSH rule, change Source to **"My IP"** (AWS will auto-detect)
+5. Save rules
+6. Wait 30 seconds, try again
+
+**Problem:** Your IP changed
+
+**Solution:**
+- Go to https://whatismyipaddress.com/
+- Note your current IP
+- Update security group SSH rule with new IP
+
+---
+
+### Step 1.3: Install Docker and Docker Compose
+
+**Run these commands one by one in your SSH terminal:**
 
 ```bash
 # Update package list
@@ -233,8 +373,10 @@ echo \
   "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
   $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-# Install Docker Engine
+# Update package list again
 sudo apt update
+
+# Install Docker Engine (this takes 1-2 minutes)
 sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
 # Add your user to docker group (avoid using sudo)
@@ -250,386 +392,955 @@ docker compose version
 
 **Expected output:**
 ```
-Docker version 24.x.x
-Docker Compose version v2.x.x
+Docker version 27.3.1
+Docker Compose version v2.29.7
 ```
+
+**What each command does:**
+- `apt update` - Updates the list of available packages
+- `apt install prerequisites` - Installs tools needed for Docker
+- `curl/gpg` - Adds Docker's security key to verify packages
+- `apt install docker` - Installs Docker Engine
+- `usermod` - Allows running Docker without `sudo`
+- `docker --version` - Confirms Docker is installed
 
 ---
 
-### **PHASE 2: Deploy Application (20 minutes)**
+## Phase 2: Deploy Application (20 minutes)
 
-#### Step 2.1: Transfer Files to EC2
+### Step 2.1: Clone Repository to EC2
 
-**Option A: Using SCP (Mac/Linux/Windows PowerShell)**
-
-On your **local computer** (not EC2), open a new terminal and run:
+**On your EC2 instance:**
 
 ```bash
-# Navigate to your project directory
-cd c:\Users\aayus\PRODUCT
+# Clone the AWS branch from GitHub
+git clone -b AWS https://github.com/Kattu2003/PRODUCT.git ~/vkare
 
-# Create a zip file of your project (excluding development files)
-# On Windows (PowerShell):
-Compress-Archive -Path * -DestinationPath vkare-app.zip -Force
-
-# On Mac/Linux:
-zip -r vkare-app.zip . -x "*.git*" "*node_modules*" "*__pycache__*" "*.venv*"
-
-# Copy to EC2 (replace with YOUR key path and IP)
-scp -i ~/Downloads/vkare-key.pem vkare-app.zip ubuntu@54.123.45.67:~/
-```
-
-**Option B: Using Git (Recommended)**
-
-If your code is on GitHub (make sure .env is in .gitignore!):
-
-```bash
-# On EC2 instance
-git clone https://github.com/yourusername/vkare.git
-cd vkare
-```
-
-**Option C: Manual File Transfer (Windows - WinSCP)**
-1. Download WinSCP: https://winscp.net/
-2. Connect using your .ppk key
-3. Drag and drop the PRODUCT folder
-
----
-
-#### Step 2.2: Setup Application on EC2
-
-**Back in your EC2 SSH terminal:**
-
-```bash
-# If you used zip file, extract it
-cd ~
-unzip vkare-app.zip -d vkare
-cd vkare
-
-# If you used git clone
+# Navigate into the directory
 cd ~/vkare
 
 # Verify files are present
 ls -la
-# You should see: docker-compose.prod.yml, services/, website/, .env.production
 ```
+
+**You should see:**
+- ✅ `docker-compose.prod.yml`
+- ✅ `services/` directory
+- ✅ `website/` directory
+- ✅ `AWS_DEPLOYMENT_GUIDE.md`
+
+**Note:** `.env.production` is NOT in the repo (it's in .gitignore for security)
 
 ---
 
-#### Step 2.3: Configure Environment Variables
+### Step 2.2: Upload .env.production File
 
-```bash
-# Edit the production environment file
-nano .env.production
+**IMPORTANT:** Your `.env.production` file contains API keys and should never be in Git.
+
+#### Method 1: Upload from Windows (Recommended)
+
+**On your Windows computer** (open a NEW PowerShell window):
+
+```powershell
+# Navigate to your local project
+cd C:\Users\aayus\PRODUCT
+
+# Upload .env.production to EC2
+scp -i C:\Users\aayus\Downloads\vkare-key.pem .env.production ubuntu@13.61.186.207:~/vkare/
 ```
 
-**Verify these values are correct:**
-- ✅ AZURE_OPENAI_GPT5_ENDPOINT
-- ✅ AZURE_OPENAI_GPT5_KEY
-- ✅ AZURE_OPENAI_WHISPER_ENDPOINT
-- ✅ AZURE_OPENAI_WHISPER_KEY
-- ✅ MAYA_API_KEY
+**Replace `13.61.186.207`** with your EC2 public IP.
 
-Press `Ctrl + X`, then `Y`, then `Enter` to save and exit.
+**Expected output:**
+```
+.env.production                    100%  2154    50.3KB/s   00:00
+```
+
+#### Method 2: Copy-Paste Manually
+
+If SCP doesn't work:
+
+1. **On EC2:**
+   ```bash
+   cd ~/vkare
+   nano .env.production
+   ```
+
+2. **On Windows:**
+   - Open `C:\Users\aayus\PRODUCT\.env.production` in Notepad
+   - Select all (Ctrl+A), Copy (Ctrl+C)
+
+3. **Back in EC2 nano editor:**
+   - Right-click to paste (or Shift+Insert)
+   - Press `Ctrl + O` to save
+   - Press `Enter` to confirm
+   - Press `Ctrl + X` to exit
+
+#### Verify Upload:
+
+```bash
+# Check file exists
+ls -lh ~/vkare/.env.production
+
+# Check first few lines (should show Azure config)
+head -n 5 ~/vkare/.env.production
+```
+
+You should see your Azure OpenAI configuration.
 
 ---
 
-#### Step 2.4: Build and Start Services
+### Step 2.3: Build Docker Images
+
+This downloads base images and builds your application (takes 5-10 minutes):
 
 ```bash
-# Build all Docker images (this takes 5-10 minutes)
+cd ~/vkare
 docker compose -f docker-compose.prod.yml build
+```
 
-# Start all services
+**Expected output:**
+```
+[+] Building 234.5s (45/45) FINISHED
+ => [stt internal] load build definition
+ => [llm-core internal] load build definition
+ => [orchestrator internal] load build definition
+ ...
+ => exporting to image
+Successfully built...
+```
+
+**What's happening:**
+- Downloading Python 3.11, Node.js 20, Nginx images
+- Installing dependencies for each service
+- Building 6 Docker images
+
+**If you see errors:**
+- Check `.env.production` is present
+- Verify internet connection
+- Check disk space: `df -h`
+
+---
+
+### Step 2.4: Start All Services
+
+```bash
 docker compose -f docker-compose.prod.yml up -d
+```
 
-# Check if all services are running
+**Expected output:**
+```
+[+] Running 6/6
+ ✔ Container vkare-stt-1          Started
+ ✔ Container vkare-llm-core-1     Started
+ ✔ Container vkare-tts-1          Started
+ ✔ Container vkare-orchestrator-1 Started
+ ✔ Container vkare-backend-1      Started
+ ✔ Container vkare-website-1      Started
+```
+
+**The `-d` flag** means "detached mode" (runs in background).
+
+---
+
+### Step 2.5: Verify Services are Running
+
+```bash
+# Check status of all containers
 docker compose -f docker-compose.prod.yml ps
 ```
 
-**Expected output:** All services should show "Up" status:
+**Expected output:**
 ```
-NAME                STATUS
-vkare-stt-1         Up (healthy)
-vkare-llm-core-1    Up (healthy)
-vkare-tts-1         Up (healthy)
-vkare-orchestrator-1 Up (healthy)
-vkare-website-1     Up
-vkare-backend-1     Up (healthy)
+NAME                     STATUS
+vkare-backend-1          Up 48 minutes (healthy)
+vkare-llm-core-1         Up 48 minutes (healthy)
+vkare-orchestrator-1     Up 48 minutes (healthy)
+vkare-stt-1              Up 48 minutes (healthy)
+vkare-tts-1              Up 48 minutes (healthy)
+vkare-website-1          Up 15 seconds
 ```
 
-**Check logs if any service is failing:**
+**All should show "Up" or "Up (healthy)"**
+
+#### If any service shows "Exited" or "Unhealthy":
+
 ```bash
+# Check logs for that service
 docker compose -f docker-compose.prod.yml logs stt
 docker compose -f docker-compose.prod.yml logs llm-core
 docker compose -f docker-compose.prod.yml logs orchestrator
+
+# Common issues:
+# - Missing .env.production file
+# - Invalid API keys
+# - Port conflicts
 ```
 
 ---
 
-#### Step 2.5: Test Application
+### Step 2.6: Test Application
 
+**Test from EC2:**
 ```bash
-# Test from EC2 instance
 curl http://localhost/
-
-# You should see HTML output from your landing page
 ```
 
-**From your browser, visit:**
-- `http://YOUR_EC2_PUBLIC_IP/` (replace with actual IP like 54.123.45.67)
+You should see HTML output from your landing page.
 
-You should see your Vkare landing page! 🎉
+**Test from your browser:**
 
----
+Visit: `http://YOUR_EC2_PUBLIC_IP/` (e.g., `http://13.61.186.207/`)
 
-### **PHASE 3: Setup Domain and SSL (45 minutes)**
+✅ **You should see your Vkare landing page!**
 
-#### Step 3.1: Create Application Load Balancer
-
-1. **Navigate to EC2 → Load Balancers**
-   - Click **"Create Load Balancer"**
-   - Select **"Application Load Balancer"**
-
-2. **Basic Configuration**
-   - Name: `vkare-alb`
-   - Scheme: **Internet-facing**
-   - IP address type: **IPv4**
-
-3. **Network Mapping**
-   - VPC: Select your default VPC
-   - Availability Zones: Select **at least 2 zones** (e.g., us-east-1a, us-east-1b)
-
-4. **Security Groups**
-   - Create new: `vkare-alb-sg`
-   - Inbound rules:
-     - HTTP (80) from Anywhere (0.0.0.0/0)
-     - HTTPS (443) from Anywhere (0.0.0.0/0)
-
-5. **Listeners and Routing**
-
-   **HTTP Listener (Port 80):**
-   - Click **"Create target group"** (opens new tab)
-     - Target type: **Instances**
-     - Name: `vkare-targets`
-     - Protocol: **HTTP**
-     - Port: **80**
-     - VPC: Default VPC
-     - Health check path: `/`
-     - Click **Next**
-     - Select your EC2 instance
-     - Click **"Include as pending below"**
-     - Click **"Create target group"**
-
-   - Back on ALB page, refresh target groups
-   - Select `vkare-targets`
-
-6. **HTTPS Listener (Port 443)** - Skip for now, we'll add after SSL certificate
-
-7. **Review and Create**
-   - Click **"Create load balancer"**
-   - Wait 2-3 minutes for provisioning
-   - Note the **DNS name** (e.g., vkare-alb-xxxxxxxxx.us-east-1.elb.amazonaws.com)
+**At this point:**
+- ✅ Application is running
+- ✅ Accessible via HTTP
+- ❌ Microphone WON'T work yet (needs HTTPS)
 
 ---
 
-#### Step 3.2: Test Load Balancer
+## Phase 3: Setup Domain and SSL (60 minutes)
 
-In your browser, visit:
-- `http://vkare-alb-xxxxxxxxx.us-east-1.elb.amazonaws.com/`
+### Why Do We Need This Phase?
 
-You should see your application! ✅
+**Modern browsers require HTTPS for microphone access.** Without SSL:
+- ❌ Voice recording won't work
+- ❌ Users see "Not Secure" warning
+- ❌ Looks unprofessional
 
----
-
-#### Step 3.3: Request SSL Certificate
-
-1. **Navigate to Certificate Manager (ACM)**
-   - Search for "Certificate Manager" in AWS Console
-   - **Important:** Make sure you're in the **same region** as your load balancer
-
-2. **Request Certificate**
-   - Click **"Request a certificate"**
-   - Certificate type: **Public certificate**
-   - Click **Next**
-
-3. **Domain Names**
-   - Add these domains:
-     - `v-kare.co.in`
-     - `www.v-kare.co.in`
-     - `*.v-kare.co.in` (optional wildcard)
-
-4. **Validation Method**
-   - Select **DNS validation**
-   - Click **Request**
-
-5. **Validate Domain Ownership**
-   - Click on the certificate ID
-   - You'll see validation records for each domain
-   - **For each domain**, you'll see:
-     - CNAME name: `_xxxxxx.v-kare.co.in`
-     - CNAME value: `_xxxxxx.acm-validations.aws.`
+**After this phase:**
+- ✅ HTTPS enabled with padlock 🔒
+- ✅ Microphone access works
+- ✅ Professional domain (v-kare.co.in)
+- ✅ Free SSL certificate (auto-renewing)
 
 ---
 
-#### Step 3.4: Configure DNS (Route 53 or External Provider)
+### Step 3.1: Point Domain to EC2 IP
 
-**Option A: Using Route 53 (Recommended)**
+#### For GoDaddy (as used in our deployment):
 
-1. **Transfer domain to Route 53** (if not already)
-   - Navigate to **Route 53**
-   - Click **"Hosted zones"** → **"Create hosted zone"**
-   - Domain name: `v-kare.co.in`
-   - Type: **Public hosted zone**
-   - Click **Create**
+1. **Login to GoDaddy**
+   - Go to https://dcc.godaddy.com/
+   - Sign in with your credentials
 
-2. **Update nameservers at your domain registrar**
-   - Route 53 will show 4 nameservers (ns-xxx.awsdns-xx.com)
-   - Go to your domain registrar (where you bought v-kare.co.in)
-   - Update nameservers to use these 4 AWS nameservers
-   - **Wait 24-48 hours for DNS propagation**
+2. **Navigate to DNS Management**
+   - Find your domain: **v-kare.co.in**
+   - Click on it
+   - Click **"DNS"** or **"Manage DNS"**
 
-3. **Add validation records**
-   - In Route 53 hosted zone for v-kare.co.in
-   - Click **"Create record"**
-   - For each validation record from ACM:
-     - Record name: Copy from ACM (e.g., `_xxxxxx`)
-     - Record type: **CNAME**
-     - Value: Copy from ACM (e.g., `_xxxxxx.acm-validations.aws.`)
-     - Click **Create records**
+3. **Add/Edit A Record for Root Domain**
 
-4. **Add domain records**
+   **Look for existing A record with Name "@" or blank:**
+   - If exists: Click **Edit** (pencil icon)
+   - If not: Click **"Add"** or **"Add New Record"**
 
-   **Record 1: Root domain (v-kare.co.in)**
-   - Record name: Leave empty
-   - Record type: **A**
-   - Alias: **Yes**
-   - Route traffic to: **Alias to Application Load Balancer**
-   - Region: Select your region
-   - Load balancer: Select `vkare-alb`
-   - Click **Create records**
+   **Fill in:**
+   - Type: **A**
+   - Name: **@** (represents root domain v-kare.co.in)
+   - Data/Value: **YOUR_EC2_PUBLIC_IP** (e.g., `13.61.186.207`)
+   - TTL: **1 Hour** (or 3600 seconds)
 
-   **Record 2: WWW subdomain**
-   - Record name: `www`
-   - Record type: **A**
-   - Alias: **Yes**
-   - Route traffic to: **Alias to Application Load Balancer**
-   - Region: Select your region
-   - Load balancer: Select `vkare-alb`
-   - Click **Create records**
+   Click **Save**
 
-**Option B: Using External DNS Provider (GoDaddy, Namecheap, etc.)**
+4. **Delete Conflicting CNAME Records**
 
-1. **Add validation records**
-   - Login to your DNS provider
-   - Add CNAME records from ACM for validation
+   **If you see a CNAME record for "www":**
+   - It will conflict with the A record we're about to add
+   - Click the **trash icon** to delete it
+   - Confirm deletion
 
-2. **Point domain to Load Balancer**
-   - Add A record or CNAME:
-     - **Host:** `@` (root)
-     - **Points to:** Your ALB DNS (vkare-alb-xxxxxxxxx.us-east-1.elb.amazonaws.com)
-     - **TTL:** 3600
+5. **Add A Record for WWW Subdomain**
 
-   - Add CNAME for www:
-     - **Host:** `www`
-     - **Points to:** Your ALB DNS
-     - **TTL:** 3600
+   Click **"Add New Record"**
 
----
+   **Fill in:**
+   - Type: **A**
+   - Name: **www**
+   - Data/Value: **YOUR_EC2_PUBLIC_IP** (same as above)
+   - TTL: **1 Hour**
 
-#### Step 3.5: Wait for Certificate Validation
+   Click **Save**
 
-- Go back to **Certificate Manager**
-- Refresh until status shows **"Issued"** (can take 5-30 minutes)
-- If stuck, verify DNS records are correct
+6. **Verify DNS Records**
 
----
+   **You should now have:**
+   | Type | Name | Data | TTL |
+   |------|------|------|-----|
+   | A | @ | 13.61.186.207 | 1 Hour |
+   | A | www | 13.61.186.207 | 1 Hour |
+   | NS | @ | ns11.domaincontrol.com | 1 Hour |
+   | NS | @ | ns12.domaincontrol.com | 1 Hour |
 
-#### Step 3.6: Add HTTPS Listener to Load Balancer
+7. **Wait for DNS Propagation**
+   - DNS changes take **5-30 minutes** to propagate
+   - Sometimes up to 24-48 hours worldwide
 
-1. **Navigate to EC2 → Load Balancers**
-   - Select `vkare-alb`
-   - Go to **"Listeners and rules"** tab
+8. **Test DNS**
 
-2. **Add HTTPS Listener**
-   - Click **"Add listener"**
-   - Protocol: **HTTPS**
-   - Port: **443**
-   - Default action: **Forward to** `vkare-targets`
-   - Security policy: **ELBSecurityPolicy-TLS13-1-2-2021-06** (recommended)
-   - Default SSL certificate: Select your ACM certificate
-   - Click **"Add"**
+   **After 10 minutes, visit in your browser:**
+   - `http://v-kare.co.in`
+   - `http://www.v-kare.co.in`
 
-3. **Modify HTTP Listener to Redirect**
-   - Select the HTTP:80 listener
-   - Click **"Edit"**
-   - Default action: **Redirect**
-     - Protocol: **HTTPS**
-     - Port: **443**
-     - Status code: **301 - Permanently moved**
-   - Click **"Save changes"**
+   **Both should show your application!**
+
+#### For Other DNS Providers (Namecheap, Cloudflare, etc.):
+
+**The process is similar:**
+1. Login to your DNS provider
+2. Find DNS management / Advanced DNS
+3. Add A record: @ → YOUR_EC2_IP
+4. Add A record: www → YOUR_EC2_IP
+5. Save and wait for propagation
 
 ---
 
-#### Step 3.7: Update Security Group on EC2
+### Step 3.2: Update EC2 Security Group for HTTPS
 
-Your EC2 instance should only accept traffic from the Load Balancer, not directly from the internet.
+**We need to allow HTTPS traffic (port 443):**
 
-1. **Navigate to EC2 → Security Groups**
-   - Find `vkare-sg` (your EC2 security group)
+1. **Go to AWS Console → EC2**
+2. **Click on "Instances"** (left sidebar)
+3. **Select your instance** (`vkare-production-server`)
+4. **Click "Security" tab** (bottom panel)
+5. **Click on the Security Group name** (e.g., `sg-01354e17daaa81f6c` or `vkare-sg`)
+6. **Click "Edit inbound rules"**
+7. **Check if HTTPS (443) already exists**
 
-2. **Edit Inbound Rules**
-   - **Remove:** HTTP (80) from Anywhere
-   - **Add:** HTTP (80) from `vkare-alb-sg` (ALB security group)
-   - **Keep:** SSH (22) from My IP
-   - **Remove:** HTTPS (443) if present
+   **If you see:**
+   ```
+   Type: HTTPS
+   Port: 443
+   Source: 0.0.0.0/0
+   ```
+
+   ✅ **Perfect! It already exists.** Click "Cancel" and proceed to next step.
+
+   **If NOT present:**
+   - Click **"Add rule"**
+   - Type: **HTTPS**
+   - Source: **Anywhere-IPv4** (0.0.0.0/0)
+   - Description: `HTTPS for SSL`
    - Click **"Save rules"**
 
+**Note:** If you try to add a duplicate rule, AWS will show error:
+> "the specified rule already exists"
+
+This is fine - it means the rule is already there!
+
 ---
 
-### **PHASE 4: Final Testing (10 minutes)**
+### Step 3.3: Install Certbot on EC2
 
-#### Step 4.1: Test Your Domain
+**SSH to your EC2 instance** and run:
 
-Visit these URLs in your browser:
-- ✅ `http://v-kare.co.in` → Should redirect to HTTPS
-- ✅ `https://v-kare.co.in` → Should load with padlock icon
-- ✅ `https://www.v-kare.co.in` → Should work
-- ✅ `https://v-kare.co.in/login.html` → Test authentication
-- ✅ `https://v-kare.co.in/user-dashboard.html` → Test dashboard
+```bash
+# Update package list
+sudo apt update
 
-#### Step 4.2: Test Voice Recording
+# Install Certbot and Nginx plugin
+sudo apt install -y certbot python3-certbot-nginx
 
-1. Login to application
-2. Go to user dashboard
-3. Click voice recording
-4. Grant microphone permissions
-5. Record a test message
-6. Verify STT → LLM → TTS pipeline works
+# Verify installation
+certbot --version
+```
 
-#### Step 4.3: Check Service Health
+**Expected output:** `certbot 2.9.0` (or similar version)
+
+**What is Certbot?**
+- Free tool from Let's Encrypt
+- Automatically obtains and renews SSL certificates
+- Validates you own the domain
+- Sets up auto-renewal
+
+---
+
+### Step 3.4: Stop Docker Nginx Container
+
+We need to temporarily stop the Docker Nginx so Certbot can use port 80:
+
+```bash
+cd ~/vkare
+docker compose -f docker-compose.prod.yml stop website
+```
+
+**This stops only the website container, others keep running.**
+
+---
+
+### Step 3.5: Install Nginx on Host System
+
+```bash
+# Install Nginx on EC2 (not in Docker)
+sudo apt install -y nginx
+
+# Start Nginx service
+sudo systemctl start nginx
+sudo systemctl enable nginx
+
+# Check if it's running
+sudo systemctl status nginx
+```
+
+**Expected output:**
+```
+● nginx.service - A high performance web server and a reverse proxy server
+     Loaded: loaded
+     Active: active (running)
+```
+
+Press `q` to exit the status view.
+
+**Why install Nginx on the host?**
+- Handles SSL termination
+- Proxies HTTPS traffic to Docker containers
+- Manages Let's Encrypt certificate renewal
+
+---
+
+### Step 3.6: Obtain SSL Certificate from Let's Encrypt
+
+**IMPORTANT:** Replace `your-email@example.com` with your real email!
+
+```bash
+sudo certbot certonly --nginx -d v-kare.co.in -d www.v-kare.co.in --email your-email@example.com --agree-tos --no-eff-email
+```
+
+**Example:**
+```bash
+sudo certbot certonly --nginx -d v-kare.co.in -d www.v-kare.co.in --email neura.sike@gmail.com --agree-tos --no-eff-email
+```
+
+**What this command does:**
+- `certonly` - Get certificate but don't auto-configure
+- `--nginx` - Use Nginx plugin
+- `-d v-kare.co.in -d www.v-kare.co.in` - Get cert for both domains
+- `--email` - Your email for renewal notifications
+- `--agree-tos` - Agree to Let's Encrypt terms
+- `--no-eff-email` - Don't share email with EFF
+
+**Expected output:**
+```
+Saving debug log to /var/log/letsencrypt/letsencrypt.log
+Account registered.
+Requesting a certificate for v-kare.co.in and www.v-kare.co.in
+
+Successfully received certificate.
+Certificate is saved at: /etc/letsencrypt/live/v-kare.co.in/fullchain.pem
+Key is saved at:         /etc/letsencrypt/live/v-kare.co.in/privkey.pem
+This certificate expires on 2026-01-19.
+These files will be updated when the certificate renews.
+Certbot has set up a scheduled task to automatically renew this certificate in the background.
+```
+
+✅ **Success!** You now have a free SSL certificate!
+
+**If you see errors:**
+
+**Error:** "Connection refused" or "Failed to connect"
+- **Cause:** DNS not propagated yet
+- **Solution:** Wait 10 more minutes, try again
+
+**Error:** "Invalid response from http://v-kare.co.in/.well-known"
+- **Cause:** Nginx not serving the validation file
+- **Solution:** Check if Nginx is running: `sudo systemctl status nginx`
+
+---
+
+### Step 3.7: Configure Nginx as Reverse Proxy with SSL
+
+**Create Nginx configuration file:**
+
+```bash
+sudo nano /etc/nginx/sites-available/vkare
+```
+
+**Paste this configuration** (right-click or Shift+Insert to paste):
+
+```nginx
+# HTTP to HTTPS redirect
+server {
+    listen 80;
+    server_name v-kare.co.in www.v-kare.co.in;
+
+    # Certbot renewal path (keep this!)
+    location /.well-known/acme-challenge/ {
+        root /var/www/html;
+    }
+
+    # Redirect all other traffic to HTTPS
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# HTTPS server
+server {
+    listen 443 ssl http2;
+    server_name v-kare.co.in www.v-kare.co.in;
+
+    # SSL certificates from Let's Encrypt
+    ssl_certificate /etc/letsencrypt/live/v-kare.co.in/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/v-kare.co.in/privkey.pem;
+
+    # SSL configuration (modern, secure)
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    # Proxy to Docker containers
+    location / {
+        proxy_pass http://localhost:8085;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 300s;
+        proxy_read_timeout 300s;
+        proxy_buffering off;
+    }
+}
+```
+
+**Understanding this configuration:**
+
+**HTTP Server (Port 80):**
+- Listens on port 80 (HTTP)
+- Keeps `/.well-known/acme-challenge/` for certificate renewal
+- Redirects everything else to HTTPS (301 permanent redirect)
+
+**HTTPS Server (Port 443):**
+- Listens on port 443 (HTTPS)
+- Uses SSL certificates from Let's Encrypt
+- Proxies all traffic to Docker Nginx on port 8085
+- Passes correct headers (Host, IP, protocol) to backend
+
+**Save the file:**
+- Press `Ctrl + O` (WriteOut)
+- Press `Enter` to confirm filename
+- Press `Ctrl + X` to exit
+
+---
+
+### Step 3.8: Enable Nginx Configuration
+
+```bash
+# Create symbolic link to enable the site
+sudo ln -s /etc/nginx/sites-available/vkare /etc/nginx/sites-enabled/
+
+# Remove default site (prevents conflicts)
+sudo rm -f /etc/nginx/sites-enabled/default
+
+# Test Nginx configuration (IMPORTANT!)
+sudo nginx -t
+```
+
+**Expected output:**
+```
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+```
+
+✅ **If you see "test is successful"**, proceed!
+
+❌ **If you see errors:**
+- Check for typos in the config file
+- Verify SSL certificate paths exist: `ls /etc/letsencrypt/live/v-kare.co.in/`
+- Re-edit the file: `sudo nano /etc/nginx/sites-available/vkare`
+
+**Reload Nginx:**
+```bash
+sudo systemctl reload nginx
+```
+
+---
+
+### Step 3.9: Update Docker Compose Port Mapping
+
+We need to change Docker Nginx from port 80 to port 8085:
+
+```bash
+cd ~/vkare
+nano docker-compose.prod.yml
+```
+
+**Find the `website:` section (around line 67-74):**
+
+```yaml
+  website:
+    image: nginx:alpine
+    ports:
+      - "80:80"     # ← FIND THIS LINE
+    volumes:
+      - "./website:/usr/share/nginx/html:ro"
+      - "./website/nginx.conf:/etc/nginx/conf.d/default.conf:ro"
+    depends_on:
+      orchestrator:
+        condition: service_healthy
+    restart: unless-stopped
+```
+
+**Change to:**
+```yaml
+  website:
+    image: nginx:alpine
+    ports:
+      - "8085:80"   # ← CHANGED TO 8085
+    volumes:
+      - "./website:/usr/share/nginx/html:ro"
+      - "./website/nginx.conf:/etc/nginx/conf.d/default.conf:ro"
+    depends_on:
+      orchestrator:
+        condition: service_healthy
+    restart: unless-stopped
+```
+
+**Why this change?**
+- Host Nginx listens on port 80 (for HTTP) and 443 (for HTTPS)
+- Docker Nginx now listens on port 8085
+- Host Nginx proxies requests to Docker Nginx on 8085
+- This prevents port conflicts
+
+**Save:**
+- Press `Ctrl + O`, `Enter`, `Ctrl + X`
+
+---
+
+### Step 3.10: Restart Docker Containers
+
+```bash
+cd ~/vkare
+docker compose -f docker-compose.prod.yml up -d
+```
+
+**Expected output:**
+```
+[+] Running 6/6
+ ✔ Container vkare-stt-1          Started
+ ✔ Container vkare-llm-core-1     Started
+ ✔ Container vkare-tts-1          Started
+ ✔ Container vkare-orchestrator-1 Started
+ ✔ Container vkare-backend-1      Started
+ ✔ Container vkare-website-1      Started
+```
+
+**Verify all services:**
+```bash
+docker compose -f docker-compose.prod.yml ps
+```
+
+**All should show "Up" or "Up (healthy)"**
+
+---
+
+### Step 3.11: Setup SSL Auto-Renewal
+
+Let's Encrypt certificates expire every **90 days**. Setup automatic renewal:
+
+```bash
+# Test renewal (dry run - doesn't actually renew)
+sudo certbot renew --dry-run
+```
+
+**Expected output:**
+```
+Congratulations, all simulated renewals succeeded:
+  /etc/letsencrypt/live/v-kare.co.in/fullchain.pem (success)
+```
+
+**Enable auto-renewal timer:**
+```bash
+# Enable automatic renewal service
+sudo systemctl enable certbot.timer
+sudo systemctl start certbot.timer
+
+# Check timer status
+sudo systemctl status certbot.timer
+```
+
+**Expected output:**
+```
+● certbot.timer - Run certbot twice daily
+     Loaded: loaded
+     Active: active (waiting)
+```
+
+Press `q` to exit.
+
+**What this does:**
+- Certbot will check for renewal twice daily
+- Automatically renews certificates 30 days before expiration
+- No manual intervention needed!
+
+---
+
+### Step 3.12: Test HTTPS and Microphone Access! 🎉
+
+#### Test 1: HTTPS Works
+
+**In your browser, visit:**
+```
+https://v-kare.co.in
+```
+
+**You should see:**
+- ✅ **Padlock icon** 🔒 in the address bar
+- ✅ URL shows "https://" (not "http://")
+- ✅ No security warnings
+- ✅ Your Vkare landing page loads
+
+**Click the padlock icon:**
+- Should show "Connection is secure"
+- Certificate valid
+- Issued by: Let's Encrypt
+
+#### Test 2: HTTP Redirects to HTTPS
+
+**Visit:**
+```
+http://v-kare.co.in
+```
+
+**Should automatically redirect to:**
+```
+https://v-kare.co.in
+```
+
+#### Test 3: WWW Works
+
+**Visit:**
+```
+https://www.v-kare.co.in
+```
+
+**Should also work with HTTPS and padlock!**
+
+#### Test 4: Microphone Access (THE MAIN GOAL!)
+
+1. **Visit:** `https://v-kare.co.in`
+2. **Click "Login"**
+3. **Login** with your account (or create new account)
+4. **Go to User Dashboard**
+5. **Click the microphone icon** 🎤
+
+**Expected behavior:**
+- ✅ Browser asks: "v-kare.co.in wants to use your microphone"
+- ✅ Click **"Allow"**
+- ✅ Microphone icon becomes active
+- ✅ **NO MORE "Microphone access denied" error!**
+
+6. **Record a test message**
+   - Say something like "Hello, I'm testing the voice feature"
+   - Stop recording
+
+7. **Verify AI pipeline:**
+   - ✅ STT transcribes your speech
+   - ✅ LLM generates response
+   - ✅ TTS converts to audio
+   - ✅ You hear the AI response!
+
+**🎉 SUCCESS! Your application is fully deployed!**
+
+---
+
+## Post-Deployment
+
+### Verify Everything is Working
+
+Run these checks:
 
 ```bash
 # SSH to EC2
-ssh -i ~/Downloads/vkare-key.pem ubuntu@54.123.45.67
+ssh -i C:\Users\aayus\Downloads\vkare-key.pem ubuntu@13.61.186.207
 
 # Check all containers
+cd ~/vkare
 docker compose -f docker-compose.prod.yml ps
 
-# Check orchestrator logs
-docker compose -f docker-compose.prod.yml logs --tail=50 orchestrator
+# Expected: All show "Up (healthy)"
 
-# Check for errors
-docker compose -f docker-compose.prod.yml logs --tail=100 | grep -i error
+# Check Nginx host service
+sudo systemctl status nginx
+
+# Expected: Active (running)
+
+# Check SSL certificate
+sudo certbot certificates
+
+# Expected: Shows certificate valid until 2026-01-19
+
+# Check auto-renewal timer
+sudo systemctl status certbot.timer
+
+# Expected: Active (waiting)
 ```
 
 ---
 
-## Post-Deployment Configuration
+### Architecture Summary
 
-### Enable Automated Backups
+**What's running:**
 
-**For SQLite Database:**
+```
+Port 80 (HTTP)  → Nginx Host → Redirects to HTTPS
+Port 443 (HTTPS) → Nginx Host → SSL Termination → Port 8085 (Docker Nginx)
+                                                   ↓
+                                                Backend :9000
+                                                Orchestrator :8000
+                                                STT :8001
+                                                LLM :8002
+                                                TTS :8003
+```
+
+**Traffic flow:**
+1. User visits `https://v-kare.co.in`
+2. DNS resolves to EC2 public IP
+3. Request hits EC2 port 443 (HTTPS)
+4. Host Nginx decrypts SSL
+5. Proxies to Docker Nginx on port 8085
+6. Docker Nginx serves static files OR proxies to backend services
+7. Response returns encrypted via SSL
+
+---
+
+### Your Live System
+
+**Public URL:** https://v-kare.co.in
+**Status:** ✅ LIVE and accessible worldwide
+**SSL Certificate:** Valid until 2026-01-19 (auto-renews)
+**Cost:** ~$1/month (first year)
+
+**Anyone can now:**
+- Visit your domain
+- Create account
+- Login
+- Use voice AI therapy
+- Access all features
+
+---
+
+## Monitoring and Maintenance
+
+### Daily Checks
+
+**Check service health:**
+```bash
+ssh -i vkare-key.pem ubuntu@YOUR_EC2_IP
+cd ~/vkare
+docker compose -f docker-compose.prod.yml ps
+```
+
+All should show "Up (healthy)".
+
+---
+
+### View Logs
+
+**All services:**
+```bash
+docker compose -f docker-compose.prod.yml logs -f
+```
+
+Press `Ctrl + C` to stop following.
+
+**Specific service:**
+```bash
+docker compose -f docker-compose.prod.yml logs -f orchestrator
+docker compose -f docker-compose.prod.yml logs -f stt
+docker compose -f docker-compose.prod.yml logs -f llm-core
+```
+
+**Last 50 lines:**
+```bash
+docker compose -f docker-compose.prod.yml logs --tail=50 orchestrator
+```
+
+**Search for errors:**
+```bash
+docker compose -f docker-compose.prod.yml logs | grep -i error
+docker compose -f docker-compose.prod.yml logs | grep -i exception
+```
+
+---
+
+### Restart Services
+
+**Restart all:**
+```bash
+cd ~/vkare
+docker compose -f docker-compose.prod.yml restart
+```
+
+**Restart specific service:**
+```bash
+docker compose -f docker-compose.prod.yml restart orchestrator
+docker compose -f docker-compose.prod.yml restart backend
+```
+
+**Stop all:**
+```bash
+docker compose -f docker-compose.prod.yml down
+```
+
+**Start all:**
+```bash
+docker compose -f docker-compose.prod.yml up -d
+```
+
+---
+
+### Update Application Code
+
+**When you push new code to GitHub:**
+
+```bash
+# SSH to EC2
+ssh -i vkare-key.pem ubuntu@YOUR_EC2_IP
+
+# Navigate to project
+cd ~/vkare
+
+# Pull latest code
+git pull origin AWS
+
+# Rebuild images
+docker compose -f docker-compose.prod.yml build
+
+# Restart with new code
+docker compose -f docker-compose.prod.yml up -d
+```
+
+---
+
+### Backup Database
+
+**Your SQLite database is in the backend container:**
+
+```bash
+# Create backup directory
+mkdir -p ~/backups
+
+# Backup database
+docker compose -f ~/vkare/docker-compose.prod.yml exec backend cp /app/data.db /tmp/backup_$(date +%Y%m%d).db
+
+# Copy to EC2 host
+docker cp $(docker compose -f ~/vkare/docker-compose.prod.yml ps -q backend):/tmp/backup_$(date +%Y%m%d).db ~/backups/
+
+# List backups
+ls -lh ~/backups/
+```
+
+**Download backup to your computer:**
+```powershell
+# On Windows
+scp -i C:\Users\aayus\Downloads\vkare-key.pem ubuntu@YOUR_EC2_IP:~/backups/backup_YYYYMMDD.db C:\Users\aayus\Downloads\
+```
+
+**Automated daily backups:**
 
 ```bash
 # Create backup script
@@ -643,7 +1354,7 @@ mkdir -p $BACKUP_DIR
 docker compose -f ~/vkare/docker-compose.prod.yml exec backend cp /app/data.db /tmp/data_${TIMESTAMP}.db
 docker cp $(docker compose -f ~/vkare/docker-compose.prod.yml ps -q backend):/tmp/data_${TIMESTAMP}.db $BACKUP_DIR/
 
-# Keep only last 7 days of backups
+# Keep only last 7 days
 find $BACKUP_DIR -name "data_*.db" -mtime +7 -delete
 
 echo "Backup completed: data_${TIMESTAMP}.db"
@@ -651,256 +1362,577 @@ EOF
 
 chmod +x ~/backup.sh
 
-# Add to crontab (daily at 2 AM)
+# Add to crontab (daily at 2 AM UTC)
 (crontab -l 2>/dev/null; echo "0 2 * * * ~/backup.sh") | crontab -
+
+# Verify crontab
+crontab -l
 ```
 
-### Setup Monitoring
+---
 
-**CloudWatch Logs (Optional):**
+### View User Signups
 
-1. Navigate to **CloudWatch → Log groups**
-2. Create log group: `/aws/vkare/application`
-3. Install CloudWatch agent on EC2:
+**Query database for user count:**
 
 ```bash
-wget https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
-sudo dpkg -i -E ./amazon-cloudwatch-agent.deb
+# Total users
+docker compose -f ~/vkare/docker-compose.prod.yml exec backend sqlite3 /app/data.db "SELECT COUNT(*) as total_users FROM users;"
+
+# Users by role
+docker compose -f ~/vkare/docker-compose.prod.yml exec backend sqlite3 /app/data.db "SELECT role, COUNT(*) as count FROM users GROUP BY role;"
+
+# Recent signups (last 10)
+docker compose -f ~/vkare/docker-compose.prod.yml exec backend sqlite3 /app/data.db "SELECT email, firstName, lastName, role, createdAt FROM users ORDER BY createdAt DESC LIMIT 10;"
+
+# All user details
+docker compose -f ~/vkare/docker-compose.prod.yml exec backend sqlite3 /app/data.db "SELECT * FROM users;"
 ```
 
-### Setup Auto-restart on Reboot
-
+**Interactive database shell:**
 ```bash
-# Edit crontab
-crontab -e
+docker compose -f ~/vkare/docker-compose.prod.yml exec backend sqlite3 /app/data.db
+```
 
-# Add this line
-@reboot cd ~/vkare && docker compose -f docker-compose.prod.yml up -d
+Then run SQL queries:
+```sql
+SELECT COUNT(*) FROM users;
+SELECT * FROM users;
+.quit
+```
+
+---
+
+### Monitor Resource Usage
+
+**Check disk space:**
+```bash
+df -h
+```
+
+**Check memory:**
+```bash
+free -h
+```
+
+**Check Docker container resources:**
+```bash
+docker stats
+```
+
+**Check system load:**
+```bash
+htop
+```
+
+Press `q` to exit.
+
+---
+
+### SSL Certificate Management
+
+**Check certificate status:**
+```bash
+sudo certbot certificates
+```
+
+**Manual renewal (if needed):**
+```bash
+sudo certbot renew
+```
+
+**Test renewal:**
+```bash
+sudo certbot renew --dry-run
+```
+
+**Certificate location:**
+```
+/etc/letsencrypt/live/v-kare.co.in/fullchain.pem
+/etc/letsencrypt/live/v-kare.co.in/privkey.pem
 ```
 
 ---
 
 ## Cost Estimate
 
-### Monthly AWS Costs (US East region)
+### Monthly AWS Costs
+
+**First 12 Months (Free Tier):**
 
 | Service | Configuration | Monthly Cost |
 |---------|--------------|--------------|
-| EC2 m7i-flex.large | 2 vCPU, 8GB RAM, 750 hours | **$0** (Free tier) |
+| EC2 m7i-flex.large | 750 hours/month | **$0** (Free tier) |
 | EBS Storage | 30 GB gp3 | **$0** (Free tier 30GB) |
-| Application Load Balancer | 750 hours | **$0** (Free tier) |
-| ALB Data Processing | 15 GB | **$0** (Free tier 15GB) |
+| Data Transfer Out | Up to 100 GB | **$0** (Free tier) |
 | Route 53 Hosted Zone | 1 zone | $0.50 |
-| Route 53 Queries | 1M queries | $0.40 |
-| Data Transfer Out | 1 GB | **$0** (Free tier 100GB) |
-| **TOTAL (First Year)** | | **~$1/month** |
-| **TOTAL (After Year 1)** | | **~$80-85/month** |
+| Route 53 DNS Queries | 1M queries | $0.40 |
+| SSL Certificate (Let's Encrypt) | Auto-renewal | **$0** (Forever free) |
+| **TOTAL** | | **~$1/month** |
 
-### Free Tier Benefits (First 12 months)
-- ✅ **EC2 m7i-flex.large**: 750 hours/month FREE (enough for 24/7 operation)
-- ✅ **EBS Storage**: 30 GB FREE
-- ✅ **Application Load Balancer**: 750 hours/month FREE
-- ✅ **ALB Data Processing**: 15 GB/month FREE
-- ✅ **SSL Certificate**: Free forever
-- ✅ **Data Transfer**: 100 GB/month FREE
-- ✅ **Route 53**: 50 queries/month FREE
+**After First Year:**
 
-### After Free Tier Expires (Year 2+)
-If you need to reduce costs after the free tier:
-1. **Downgrade to t3a.medium** (~$30/month) - AMD-based, cheaper
-2. **Use EC2 Reserved Instance** (1-year commitment) - Save 30-40%
-3. **Use Spot Instance** for non-production - Save 70%
-4. **Optimize during low traffic hours** - Stop instance when not needed
+| Service | Configuration | Monthly Cost |
+|---------|--------------|--------------|
+| EC2 m7i-flex.large | On-Demand, 730 hours | ~$60 |
+| EBS Storage | 30 GB gp3 | ~$2.40 |
+| Data Transfer Out | 100 GB | ~$9 |
+| Route 53 | Hosted zone + queries | ~$1 |
+| **TOTAL** | | **~$72/month** |
+
+### Ways to Reduce Costs After Free Tier:
+
+1. **Use EC2 Reserved Instances**
+   - 1-year commitment: Save 30-40%
+   - 3-year commitment: Save up to 60%
+   - Predictable workload only
+
+2. **Use Spot Instances (Development)**
+   - Save up to 90%
+   - Can be terminated by AWS
+   - Good for dev/test environments
+
+3. **Downgrade Instance Type**
+   - t3a.medium (4GB RAM): ~$30/month
+   - May struggle under load
+   - Monitor performance before downgrading
+
+4. **Stop Instance During Off-Hours**
+   - Stop EC2 when not in use
+   - Only pay for storage (~$2/month)
+   - Good for demos/MVP
+
+5. **Setup Auto Scaling**
+   - Scale down during low traffic
+   - Scale up during peak hours
+   - Pay only for what you use
 
 ---
 
 ## Troubleshooting
 
 ### Issue: Can't SSH to EC2
-**Solution:**
-```bash
-# Check security group allows SSH from your IP
-# Verify key file permissions
-chmod 400 vkare-key.pem
 
-# Check EC2 is running
-# Try different SSH client
-```
+**Symptom:** `ssh: connect to host X.X.X.X port 22: Connection timed out`
 
-### Issue: Docker services won't start
-**Solution:**
-```bash
-# Check logs
-docker compose -f docker-compose.prod.yml logs
+**Causes:**
+1. Security group not allowing SSH from your IP
+2. Your IP address changed
+3. EC2 instance not running
 
-# Restart specific service
-docker compose -f docker-compose.prod.yml restart orchestrator
+**Solutions:**
 
-# Check disk space
-df -h
+1. **Check EC2 is running:**
+   - AWS Console → EC2 → Instances
+   - Instance state should be "Running"
 
-# Check memory
-free -h
-```
+2. **Fix security group:**
+   - Select instance → Security tab
+   - Click security group name
+   - Edit inbound rules
+   - SSH rule → Source: **My IP** (auto-detects)
+   - Save rules
 
-### Issue: SSL certificate stuck in "Pending"
-**Solution:**
-- Verify DNS CNAME records are correct
-- Wait 30 minutes for DNS propagation
-- Check domain registrar has correct nameservers
+3. **Check your current IP:**
+   - Visit https://whatismyipaddress.com/
+   - Update security group with new IP if changed
 
-### Issue: Load Balancer shows "unhealthy"
-**Solution:**
-```bash
-# Check if nginx is responding
-curl http://localhost/
-
-# Check security group allows ALB to reach EC2
-# Verify target group health check path is correct
-```
-
-### Issue: Application loads but voice recording doesn't work
-**Solution:**
-- HTTPS is required for microphone access
-- Verify orchestrator service is running
-- Check browser console for errors
-- Verify CORS settings include your domain
-
-### Issue: High latency or slow responses
-**Solution:**
-```bash
-# Upgrade to larger instance (t3.xlarge)
-# Check Azure OpenAI rate limits
-# Monitor Docker resource usage
-docker stats
-```
+4. **Wait 30 seconds, retry SSH**
 
 ---
 
-## Maintenance Commands
+### Issue: Docker Containers Won't Start
+
+**Symptom:** `docker compose ps` shows "Exited" or containers keep restarting
+
+**Solutions:**
+
+1. **Check logs:**
+   ```bash
+   docker compose -f docker-compose.prod.yml logs stt
+   docker compose -f docker-compose.prod.yml logs orchestrator
+   ```
+
+2. **Common issues:**
+
+   **Missing .env.production:**
+   ```bash
+   ls -la ~/vkare/.env.production
+   # If not found, upload it again (Step 2.2)
+   ```
+
+   **Invalid API keys:**
+   - Check Azure OpenAI endpoints and keys
+   - Verify Maya API key
+   - Edit: `nano ~/vkare/.env.production`
+
+   **Out of memory:**
+   ```bash
+   free -h
+   # If low on memory, restart instance or upgrade
+   ```
+
+   **Port conflicts:**
+   ```bash
+   sudo netstat -tlnp | grep :80
+   sudo netstat -tlnp | grep :8085
+   # Kill conflicting processes
+   ```
+
+3. **Restart from scratch:**
+   ```bash
+   docker compose -f docker-compose.prod.yml down
+   docker compose -f docker-compose.prod.yml up -d
+   ```
+
+---
+
+### Issue: SSL Certificate Failed
+
+**Symptom:** `certbot certonly` fails with errors
+
+**Error:** "Failed to connect to domain"
+
+**Causes:**
+- DNS not propagated yet
+- Domain not pointing to EC2 IP
+
+**Solutions:**
+1. Verify DNS:
+   ```bash
+   nslookup v-kare.co.in
+   # Should return your EC2 IP
+   ```
+
+2. Wait 10-30 minutes for DNS propagation
+
+3. Check Nginx is running:
+   ```bash
+   sudo systemctl status nginx
+   ```
+
+4. Retry certificate:
+   ```bash
+   sudo certbot certonly --nginx -d v-kare.co.in -d www.v-kare.co.in --email your@email.com --agree-tos --no-eff-email
+   ```
+
+---
+
+### Issue: HTTPS Not Working
+
+**Symptom:** "This site can't be reached" or "Connection refused"
+
+**Solutions:**
+
+1. **Check security group has port 443:**
+   - EC2 → Security Groups → vkare-sg
+   - Should have HTTPS (443) from 0.0.0.0/0
+
+2. **Check host Nginx is running:**
+   ```bash
+   sudo systemctl status nginx
+   ```
+
+3. **Check Nginx configuration:**
+   ```bash
+   sudo nginx -t
+   # Should say "test is successful"
+   ```
+
+4. **Check SSL certificate exists:**
+   ```bash
+   sudo ls -la /etc/letsencrypt/live/v-kare.co.in/
+   # Should show fullchain.pem and privkey.pem
+   ```
+
+5. **Restart Nginx:**
+   ```bash
+   sudo systemctl restart nginx
+   ```
+
+---
+
+### Issue: Microphone Still Not Working
+
+**Symptom:** "Microphone access denied" even with HTTPS
+
+**Solutions:**
+
+1. **Verify you're on HTTPS:**
+   - URL should show `https://` (not `http://`)
+   - Padlock icon should be visible
+
+2. **Check browser permissions:**
+   - Click padlock icon
+   - Permissions → Microphone → Allow
+
+3. **Try different browser:**
+   - Chrome/Edge (best support)
+   - Firefox (good support)
+   - Safari (limited support)
+
+4. **Check browser console:**
+   - Press F12 → Console tab
+   - Look for permission errors
+
+5. **Clear browser cache:**
+   - Ctrl+Shift+Delete
+   - Clear cached images and files
+   - Reload page
+
+---
+
+### Issue: High Latency / Slow Responses
+
+**Symptom:** Voice responses take a long time
+
+**Causes:**
+- Azure OpenAI rate limits
+- Network latency
+- Insufficient resources
+
+**Solutions:**
+
+1. **Check Azure OpenAI quotas:**
+   - Azure Portal → Cognitive Services
+   - Check rate limits and quotas
+
+2. **Monitor container resources:**
+   ```bash
+   docker stats
+   ```
+   - If CPU/Memory near 100%, upgrade instance
+
+3. **Check orchestrator logs:**
+   ```bash
+   docker compose -f docker-compose.prod.yml logs orchestrator | tail -100
+   ```
+
+4. **Upgrade instance type:**
+   - Stop instance
+   - Actions → Instance settings → Change instance type
+   - Select m7i-flex.xlarge (16GB RAM)
+   - Start instance
+
+---
+
+### Issue: Out of Disk Space
+
+**Symptom:** "No space left on device"
+
+**Solutions:**
+
+1. **Check disk usage:**
+   ```bash
+   df -h
+   # Look for / partition usage
+   ```
+
+2. **Clean Docker:**
+   ```bash
+   # Remove unused images
+   docker system prune -a
+
+   # Remove unused volumes
+   docker volume prune
+   ```
+
+3. **Clean logs:**
+   ```bash
+   # Truncate large log files
+   sudo truncate -s 0 /var/log/nginx/access.log
+   sudo truncate -s 0 /var/log/nginx/error.log
+   ```
+
+4. **Increase EBS volume:**
+   - EC2 → Volumes
+   - Select volume → Actions → Modify
+   - Increase size to 50 GB
+   - Reboot instance
+
+---
+
+## Team Member Checklist
+
+### For New Team Members Deploying from Scratch:
+
+**Pre-Deployment (10 minutes):**
+- [ ] AWS account created and verified
+- [ ] Domain purchased (e.g., GoDaddy)
+- [ ] Azure OpenAI API keys obtained
+- [ ] Maya TTS API key obtained
+- [ ] Git repository cloned locally
+- [ ] `.env.production` file created (NOT committed to Git)
+
+**Phase 1: EC2 Setup (30 minutes):**
+- [ ] EC2 instance created (m7i-flex.large, Ubuntu 24.04)
+- [ ] Key pair downloaded (vkare-key.pem)
+- [ ] Security group configured (SSH, HTTP, HTTPS)
+- [ ] SSH connection successful
+- [ ] Docker and Docker Compose installed
+- [ ] Verified: `docker --version` and `docker compose version`
+
+**Phase 2: Application Deployment (20 minutes):**
+- [ ] Repository cloned to EC2 (`~/vkare`)
+- [ ] `.env.production` uploaded to EC2
+- [ ] Docker images built successfully
+- [ ] All 6 containers started
+- [ ] All containers show "healthy" status
+- [ ] Application accessible via `http://EC2_IP/`
+
+**Phase 3: SSL and Domain (60 minutes):**
+- [ ] DNS A records created (@ and www → EC2 IP)
+- [ ] DNS propagation verified (can access via domain)
+- [ ] Security group has HTTPS (443) rule
+- [ ] Certbot installed
+- [ ] SSL certificate obtained from Let's Encrypt
+- [ ] Host Nginx configured with SSL
+- [ ] Docker Nginx port changed to 8085
+- [ ] All containers restarted
+- [ ] HTTPS working with padlock icon
+- [ ] HTTP redirects to HTTPS
+- [ ] SSL auto-renewal configured
+
+**Post-Deployment Verification:**
+- [ ] https://your-domain.com loads with padlock
+- [ ] Login works
+- [ ] User dashboard accessible
+- [ ] Microphone permission requested
+- [ ] Voice recording works
+- [ ] AI responds with voice
+- [ ] All 6 containers healthy: `docker compose ps`
+- [ ] Nginx host running: `sudo systemctl status nginx`
+- [ ] SSL certificate valid: `sudo certbot certificates`
+
+**Documentation:**
+- [ ] EC2 public IP documented
+- [ ] Domain name documented
+- [ ] SSH key stored securely
+- [ ] `.env.production` backed up (NOT in Git!)
+- [ ] Team notified of deployment URL
+
+---
+
+## Quick Reference Commands
+
+### SSH to EC2
+```bash
+ssh -i ~/Downloads/vkare-key.pem ubuntu@YOUR_EC2_IP
+```
+
+### Check Container Status
+```bash
+cd ~/vkare
+docker compose -f docker-compose.prod.yml ps
+```
 
 ### View Logs
 ```bash
-# All services
 docker compose -f docker-compose.prod.yml logs -f
-
-# Specific service
-docker compose -f docker-compose.prod.yml logs -f orchestrator
+docker compose -f docker-compose.prod.yml logs orchestrator --tail=50
 ```
 
 ### Restart Services
 ```bash
-# All services
 docker compose -f docker-compose.prod.yml restart
-
-# Specific service
-docker compose -f docker-compose.prod.yml restart stt
+docker compose -f docker-compose.prod.yml restart orchestrator
 ```
 
-### Update Application
+### Update Code
 ```bash
-# Pull latest code
 cd ~/vkare
-git pull origin main
-
-# Rebuild and restart
-docker compose -f docker-compose.prod.yml up -d --build
+git pull origin AWS
+docker compose -f docker-compose.prod.yml build
+docker compose -f docker-compose.prod.yml up -d
 ```
 
-### Check Resource Usage
+### Backup Database
 ```bash
-# Disk usage
-df -h
-
-# Memory usage
-free -h
-
-# Docker container resources
-docker stats
-
-# Top processes
-htop
+docker compose -f ~/vkare/docker-compose.prod.yml exec backend cp /app/data.db /tmp/backup.db
+docker cp $(docker compose -f ~/vkare/docker-compose.prod.yml ps -q backend):/tmp/backup.db ~/backup_$(date +%Y%m%d).db
 ```
 
----
+### Check SSL Certificate
+```bash
+sudo certbot certificates
+```
 
-## Security Best Practices
+### Test SSL Renewal
+```bash
+sudo certbot renew --dry-run
+```
 
-1. **Never commit .env files to Git**
-   ```bash
-   # Add to .gitignore
-   echo ".env*" >> .gitignore
-   ```
-
-2. **Rotate API keys every 90 days**
-
-3. **Enable CloudTrail for audit logs**
-
-4. **Setup AWS Backup for EC2**
-
-5. **Use IAM roles instead of access keys**
-
-6. **Enable EC2 termination protection**
-
-7. **Setup alerts for high costs**
-
----
-
-## Next Steps (Optional Enhancements)
-
-1. **Setup CI/CD Pipeline**
-   - Use GitHub Actions to auto-deploy on push
-   - Automated testing before deployment
-
-2. **Add Redis for Session Storage**
-   - Replace in-memory sessions with Redis
-   - Better for multi-instance scaling
-
-3. **Use RDS instead of SQLite**
-   - Amazon RDS PostgreSQL for production database
-   - Automated backups and replication
-
-4. **Setup CloudFront CDN**
-   - Faster global content delivery
-   - Reduce load on origin server
-
-5. **Auto-Scaling**
-   - Use Auto Scaling Groups
-   - Scale based on CPU/Memory metrics
-
-6. **Container Orchestration**
-   - Migrate to ECS/Fargate for better management
-   - Or use EKS (Kubernetes) for advanced scaling
-
----
-
-## Support
-
-For issues or questions:
-- AWS Documentation: https://docs.aws.amazon.com/
-- Docker Documentation: https://docs.docker.com/
-- Azure OpenAI: https://learn.microsoft.com/en-us/azure/ai-services/openai/
-
----
-
-**Deployment Guide Version:** 1.0
-**Last Updated:** 2025-10-21
-**Tested On:** AWS us-east-1 region
+### Check System Resources
+```bash
+df -h                # Disk space
+free -h              # Memory
+docker stats         # Container resources
+htop                 # System monitor
+```
 
 ---
 
 ## Summary
 
-You've successfully deployed Vkare on AWS! 🎉
-
-**What you have:**
-- ✅ Production-ready application on EC2
-- ✅ HTTPS with SSL certificate
+**What We Built:**
+- ✅ Production-ready AI therapy platform
+- ✅ 6 microservices architecture
+- ✅ HTTPS with free SSL certificate
 - ✅ Custom domain (v-kare.co.in)
-- ✅ Load balancer for high availability
-- ✅ Automated health checks
-- ✅ Secure architecture with proper security groups
+- ✅ Auto-scaling Docker containers
+- ✅ Automated SSL renewal
+- ✅ Voice AI capabilities (STT, LLM, TTS)
 
-**Your application is now accessible at:**
-- https://v-kare.co.in
-- https://www.v-kare.co.in
+**Infrastructure:**
+- AWS EC2 m7i-flex.large (8GB RAM)
+- Ubuntu 24.04 LTS
+- Docker + Docker Compose
+- Nginx (host) for SSL termination
+- Nginx (container) for app serving
+- Let's Encrypt SSL certificate
+- GoDaddy DNS
+
+**Cost:**
+- First year: ~$1/month
+- After free tier: ~$72/month
+
+**Live URL:** https://v-kare.co.in
+
+**Team Access:**
+Anyone with this guide can:
+- Deploy from scratch in 2-3 hours
+- Maintain and update the system
+- Monitor and troubleshoot issues
+- Scale as needed
+
+---
+
+**Deployment Guide Version:** 2.0 (Actual Production Deployment)
+**Last Updated:** 2025-10-21
+**Deployed By:** Aayush Katariya
+**Deployment Date:** October 21, 2025
+**Status:** ✅ LIVE and OPERATIONAL
+
+---
+
+## Support and Resources
+
+**For Questions:**
+- Review this guide thoroughly
+- Check Troubleshooting section
+- Review logs: `docker compose logs`
+
+**External Documentation:**
+- AWS EC2: https://docs.aws.amazon.com/ec2/
+- Docker: https://docs.docker.com/
+- Let's Encrypt: https://letsencrypt.org/docs/
+- Nginx: https://nginx.org/en/docs/
+
+**Monitoring:**
+- Check application: https://v-kare.co.in
+- Check SSL: https://www.ssllabs.com/ssltest/
+- Check DNS: https://dnschecker.org/
+
+---
+
+🎉 **Congratulations on deploying Vkare to production!** 🎉
