@@ -80,6 +80,12 @@ services:
     build: ./website/backend
     ports:
       - "9000:9000"
+    volumes:
+      - ./website/backend:/app
+      - /app/node_modules  # Keep container's node_modules
+    environment:
+      - NODE_ENV=development
+    command: npm run dev  # Assuming you have a dev script with nodemon
     healthcheck:
       test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:9000/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""]
       interval: 30s
