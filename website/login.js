@@ -40,6 +40,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const loginForm = document.getElementById(`${role}-login-form`);
         if (loginForm) {
             loginForm.style.display = 'block';
+            // Scroll to the login form
+            setTimeout(() => scrollToElement(loginForm), 100);
         }
     }
 
@@ -57,6 +59,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const signupForm = document.getElementById(`${role}-signup-form`);
         if (signupForm) {
             signupForm.style.display = 'block';
+            // Scroll to the signup form
+            setTimeout(() => scrollToElement(signupForm), 100);
         }
     }
 
@@ -65,6 +69,9 @@ document.addEventListener('DOMContentLoaded', function() {
         roleSelection.style.display = 'block';
         loginForms.style.display = 'none';
         signupForms.style.display = 'none';
+        
+        // Scroll to role selection
+        setTimeout(() => scrollToElement(roleSelection), 100);
         
         // Clear any error messages
         clearMessages();
