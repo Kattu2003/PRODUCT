@@ -1,0 +1,42 @@
+{
+  "project": "Vkare AI Therapy Platform",
+  "version": "1.0.0",
+  "aws": {
+    "region": "us-east-1",
+    "account_id": "YOUR_ACCOUNT_ID"
+  },
+  "resources": {
+    "s3": {
+      "bucket_name": "vkare-website",
+      "domain": "v-kare.co.in"
+    },
+    "dynamodb": {
+      "users_table": "vkare-users",
+      "sessions_table": "vkare-sessions"
+    },
+    "lambda": {
+      "auth_function": "vkare-auth",
+      "orchestrator_function": "vkare-orchestrator",
+      "stt_function": "vkare-stt",
+      "llm_function": "vkare-llm",
+      "tts_function": "vkare-tts"
+    },
+    "api_gateway": {
+      "name": "vkare-api",
+      "domain": "api.v-kare.co.in"
+    }
+  },
+  "environment_variables": {
+    "OPENAI_API_KEY": "your-openai-api-key",
+    "ELEVENLABS_API_KEY": "your-elevenlabs-api-key",
+    "AWS_POLLY_VOICE_ID": "Joanna"
+  },
+  "deployment_steps": [
+    "1. Run: ./deploy-lambda.sh",
+    "2. Run: ./upload-frontend.sh", 
+    "3. Set up API Gateway in AWS Console",
+    "4. Configure CloudFront distribution",
+    "5. Set up Route 53 for domain",
+    "6. Set environment variables for Lambda functions"
+  ]
+}
