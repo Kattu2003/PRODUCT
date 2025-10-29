@@ -8,6 +8,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const chatMessages = document.getElementById('chatMessages');
     const micButton = document.getElementById('micButton');
     const recordStatus = document.getElementById('recordStatus');
+    const journalMicButton = document.getElementById('journalMic');
+    const journalRecordStatus = document.getElementById('journalRecordStatus');
     const journalEditor = document.getElementById('journalEditor');
     const wordCount = document.getElementById('wordCount');
 
@@ -266,6 +268,96 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (micButton) {
         micButton.addEventListener('click', toggleRecording);
+    }
+
+        // Small helper to escape HTML inserted from transcription
+    function escapeHtml(unsafe) {
+        return unsafe
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    if (micButton) {
+        micButton.addEventListener('click', toggleRecording);
+    }
+
+    // Journal mic handling
+    async function toggleJournalRecording() {
+        if (journalIsRecording) {
+            // Stop recording
+            journalIsRecording = false;
+            journalRecordStatus.style.display = 'none';
+            try { journalMediaRecorder && journalMediaRecorder.stop(); } catch {}
+            journalMicButton.innerHTML = '<i class="fas fa-microphone"></i>';
+            return;
+        }
+
+        // Start recording
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const options = { mimeType: 'audio/webm' };
+            journalRecordedChunks = [];
+            journalMediaRecorder = new MediaRecorder(stream, options);
+            
+            journalMediaRecorder.ondataavailable = (e) => {
+                if (e.data && e.data.size > 0) journalRecordedChunks.push(e.data);
+            };
+            
+            journalMediaRecorder.onstop = async () => {
+                try {
+                    const blob = new Blob(journalRecordedChunks, { type: 'audio/webm' });
+                    await processRecordedAudioJournal(blob);
+                } catch (err) {
+                    showNotification('Failed to process audio');
+                }
+                stream.getTracks().forEach(t => t.stop());
+            };
+            
+            journalMediaRecorder.start();
+            journalIsRecording = true;
+            journalRecordStatus.style.display = 'block';
+            journalMicButton.innerHTML = '<i class="fas fa-stop"></i>';
+        } catch (err) {
+            showNotification('Microphone access denied');
+        }
+    }
+
+    // Process recorded audio specifically for the journal
+    async function processRecordedAudioJournal(blob) {
+        const base = getOrchestratorBaseUrl();
+        const sid = getSessionId();
+        // Transcribe
+        const form = new FormData();
+        form.append('audio', blob, 'audio.webm');
+        try {
+            const resp = await fetch(`${base}/session/${encodeURIComponent(sid)}/transcribe`, {
+                method: 'POST',
+                body: form
+            });
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const data = await resp.json();
+            if (data && data.text) {
+                // Insert at cursor position or append to end
+                const sel = window.getSelection();
+                const range = sel.getRangeAt(0);
+                const text = document.createTextNode(data.text);
+                range.insertNode(text);
+                range.setStartAfter(text);
+                range.setEndAfter(text);
+                sel.removeAllRanges();
+                sel.addRange(range);
+                updateWordCount();
+            }
+        } catch (err) {
+            showNotification('Failed to transcribe audio. Please try again.');
+        }
+    }
+
+    if (journalMicButton) {
+        journalMicButton.addEventListener('click', toggleJournalRecording);
     }
 
     // Quick response buttons
