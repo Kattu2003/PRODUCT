@@ -186,6 +186,11 @@ document.addEventListener('DOMContentLoaded', function() {
     let recordedChunks = [];
     let isRecording = false;
 
+    // Journal voice recording setup
+    let journalMediaRecorder;
+    let journalRecordedChunks = [];
+    let journalIsRecording = false;
+
     async function toggleRecording() {
         if (isRecording) {
             // Stop

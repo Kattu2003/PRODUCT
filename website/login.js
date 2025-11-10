@@ -69,12 +69,19 @@ document.addEventListener('DOMContentLoaded', function() {
         roleSelection.style.display = 'block';
         loginForms.style.display = 'none';
         signupForms.style.display = 'none';
-        
+
         // Scroll to role selection
         setTimeout(() => scrollToElement(roleSelection), 100);
-        
+
         // Clear any error messages
         clearMessages();
+    }
+
+    // Scroll to element smoothly
+    function scrollToElement(element) {
+        if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
     }
 
     // Form validation
